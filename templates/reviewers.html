@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>PR reviewers</title>
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&amp;family=Raleway:wght@300;600;800;900&amp;family=Lato:wght@500;800&amp;display=swap" rel="stylesheet" media="all" onload="this.media=&quot;all&quot;">
+        <meta charset="UTF-8">
+        <style type="text/css">
+        body {
+            font-family: Raleway, sans-serif;
+        }
+        #container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 40px;
+        }
+        .reviewer-card {
+            border: 1px black solid;
+            padding: 5px;
+        }
+        .reviewer-card.super-active {
+            background-color: lightgreen;
+        }
+        .reviewer-card.inactive {
+            background-color: lightslategrey;
+        }
+        .days-since-last-review, .days-in-last-28, .total-reviewed-prs {
+            font-weight: bold;
+        }
+        </style>
+    </head>
+    <body>
+        <h1><span class="course-name">{{ course.to_uppercase() }} </span> reviewers: <span id="reviewer-count">{{ reviewers.len() }}</span></h1>
+        <div id="container">
+            {% for reviewer in reviewers %}
+                {% let days_since_last_review = (now - reviewer.last_review).num_days() %}
+                <div class="reviewer-card {% if days_since_last_review > 28 %}inactive{% else if days_since_last_review < 14 && reviewer.prs.len() > 10 %}super-active{% endif %}">
+                    <h3><a class="username" href="https://github.com/{{reviewer.login}}">{{ reviewer.login }}</a></h3>
+                    <div>
+                        <details>
+                            <summary><span class="total-reviewed-prs">{{ reviewer.prs.len() }}</span> reviewed PRs</summary>
+                            <ul class="pr-list">
+                                {% for pr in reviewer.prs %}<li><a href="{{ pr.pr.url }}">#{{ pr.pr.number }}</a></li>{% endfor %}
+                            </ul>
+                        </details>
+                    </div>
+                    <div><span class="days-since-last-review">{{ days_since_last_review }}</span> day(s) since last review</div>
+                    <div><span class="days-in-last-28">{{ reviewer.reviews_days_in_last_28_days }}</span> review day(s) in the last 4 weeks</div>
+                    <div>Last review: <span class="last-review">{{ reviewer.last_review.date_naive() }}</span></div>
+                </div>
+            {% endfor %}
+        </div>
+    </body>
+</html>

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>Courses</h1>
+        {% for cwbm in courses_with_batch_metadata %}
+        <h2>{{ cwbm.course.name }}</h2>
+        <ul>
+            {% for batch in cwbm.batch_metadata %}
+            <li><a href="/courses/{{ cwbm.course.name }}/batches/{{ batch.github_team_slug }}">{{ batch.name }}</a></li>
+            {% endfor %}
+            <li><a href="/courses/{{ cwbm.course.name }}/reviewers">Reviewers</a></li>
+        </ul>
+        {% endfor %}
+    </body>
+</html>
