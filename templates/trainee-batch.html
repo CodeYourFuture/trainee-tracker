@@ -87,7 +87,7 @@
             <h2>Unknown PRs</h2>
             <ul>
                 {% for unknown_pr in unknown_prs %}
-                    <li><a href="{{ unknown_pr.url }}">{{ unknown_pr.url }}</a></li>
+                    <li><a href="{{ unknown_pr.url }}"> {{ unknown_pr.repo_name }} - {{ unknown_pr.title }}</a></li>
                 {% endfor %}
             </ul>
         {% endif %}
