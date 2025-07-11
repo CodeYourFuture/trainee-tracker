@@ -1,13 +1,14 @@
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, Utc};
 use indexmap::IndexMap;
-use sheets::{
-    spreadsheets::Spreadsheets,
-    types::{CellData, GridData},
-};
+use sheets::types::{CellData, GridData};
 use tracing::warn;
 
-use crate::{newtypes::Email, sheets::cell_string, Error};
+use crate::{
+    newtypes::Email,
+    sheets::{cell_string, SheetsClient},
+    Error,
+};
 
 #[derive(Debug)]
 pub struct Register {
@@ -46,17 +47,19 @@ impl Attendance {
 }
 
 pub(crate) async fn get_register(
-    client: sheets::Client,
+    client: SheetsClient,
     register_sheet_id: String,
     start_date: NaiveDate,
     end_date: NaiveDate,
 ) -> Result<Register, Error> {
     let mut modules: IndexMap<String, ModuleAttendance> = IndexMap::new();
 
-    let data = Spreadsheets { client }
+    let data = client
         .get(&register_sheet_id, true, &[])
         .await
-        .with_context(|| format!("Failed to get spreadsheet with ID {}", register_sheet_id))?;
+        .map_err(|err| {
+            err.with_context(|| format!("Failed to get spreadsheet with ID {}", register_sheet_id))
+        })?;
     for sheet in data.body.sheets {
         if let Some(properties) = &sheet.properties {
             let title = properties.title.clone();

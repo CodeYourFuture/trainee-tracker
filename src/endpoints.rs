@@ -15,7 +15,8 @@ use crate::{
     newtypes::GithubLogin,
     octocrab::{all_pages, octocrab},
     prs::{fill_in_reviewers, get_prs, PrWithReviews},
-    sheets_client, Error, ServerState,
+    sheets::sheets_client,
+    Error, ServerState,
 };
 
 pub async fn health_check() -> impl IntoResponse {
@@ -193,7 +194,7 @@ pub async fn get_region(
     OriginalUri(original_uri): OriginalUri,
     Path(github_login): Path<String>,
 ) -> Result<Json<Region>, Error> {
-    let sheets_client = sheets_client(&session, &server_state, original_uri.clone()).await?;
+    let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
     let trainees = get_trainees(
         sheets_client,
         &server_state.config.github_email_mapping_sheet_id,

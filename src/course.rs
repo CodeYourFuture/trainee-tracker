@@ -11,6 +11,7 @@ use crate::{
     octocrab::all_pages,
     prs::{get_prs, Pr},
     register::{get_register, Register},
+    sheets::SheetsClient,
     Error,
 };
 use anyhow::Context;
@@ -69,7 +70,7 @@ impl CourseScheduleWithRegisterSheetId {
             .await
             .into_iter()
             .collect::<Result<Vec<Vec<Issue>>, Error>>()
-            .context("Failed to fetch module issues")?;
+            .map_err(|err| err.context("Failed to fetch module issues"))?;
         for (module_name, mut issues) in self.module_names().into_iter().zip(module_issues) {
             // UNWRAP: By construction above.
             let module = modules.get_mut(&module_name).unwrap();
@@ -356,7 +357,7 @@ pub(crate) async fn fetch_batch_metadata(
 
 pub async fn get_batch(
     octocrab: &Octocrab,
-    sheets_client: sheets::Client,
+    sheets_client: SheetsClient,
     github_email_mapping_sheet_id: &str,
     github_org: String,
     batch_github_slug: String,
@@ -451,7 +452,7 @@ pub async fn get_batch(
                 module_to_prs[&module_name].clone(),
                 module_attendance,
             )
-            .context("Failed to match PRs to assignments")?;
+            .map_err(|err| err.context("Failed to match PRs to assignments"))?;
 
             modules.insert(module_name.clone(), module_with_submissions);
         }

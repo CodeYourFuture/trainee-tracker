@@ -17,7 +17,8 @@ use crate::{
     },
     octocrab::octocrab,
     prs::{PrState, ReviewerInfo},
-    sheets_client, Error, ServerState,
+    sheets::sheets_client,
+    Error, ServerState,
 };
 
 pub async fn list_courses(
@@ -87,7 +88,7 @@ pub async fn get_trainee_batch(
     OriginalUri(original_uri): OriginalUri,
     Path((course, batch_github_slug)): Path<(String, String)>,
 ) -> Result<Html<String>, Error> {
-    let sheets_client = sheets_client(&session, &server_state, original_uri.clone()).await?;
+    let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
     let github_org = server_state.config.github_org.clone();
     let course_schedule = server_state
         .config

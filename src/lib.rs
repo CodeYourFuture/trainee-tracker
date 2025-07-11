@@ -1,11 +1,8 @@
-use std::error::Error as StdError;
 use std::fmt::Display;
 
-use anyhow::Context;
 use axum::http::{StatusCode, Uri};
 use axum::response::{IntoResponse, Redirect, Response};
 use moka::future::Cache;
-use tower_sessions::Session;
 use tracing::error;
 use uuid::Uuid;
 
@@ -21,8 +18,6 @@ pub mod octocrab;
 pub mod prs;
 pub mod register;
 pub mod sheets;
-
-use crate::auth::GOOGLE_DRIVE_ACCESS_TOKEN_SESSION_KEY;
 
 #[derive(Clone)]
 pub struct ServerState {
@@ -46,6 +41,24 @@ pub enum Error {
     Redirect(Redirect),
 }
 
+impl Error {
+    fn context(self, context: &'static str) -> Self {
+        match self {
+            Self::UserFacing(message) => Self::UserFacing(message),
+            Self::Fatal(err) => Self::Fatal(err.context(context)),
+            Self::Redirect(redirect) => Self::Redirect(redirect),
+        }
+    }
+
+    fn with_context<F: FnOnce() -> String>(self, f: F) -> Self {
+        match self {
+            Self::UserFacing(message) => Self::UserFacing(message),
+            Self::Fatal(err) => Self::Fatal(err.context(f())),
+            Self::Redirect(redirect) => Self::Redirect(redirect),
+        }
+    }
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
@@ -66,34 +79,6 @@ impl IntoResponse for Error {
     }
 }
 
-impl StdError for Error {
-    fn source(&self) -> Option<&(dyn StdError + 'static)> {
-        match self {
-            Error::Fatal(err) => err.source(),
-            Error::UserFacing(_) => None,
-            Error::Redirect(_) => None,
-        }
-    }
-
-    fn description(&self) -> &str {
-        #[allow(deprecated)]
-        match self {
-            Error::Fatal(err) => err.description(),
-            Error::UserFacing(_) => "description is deprecated - use display",
-            Error::Redirect(_) => "description is deprecated - use display",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn StdError> {
-        #[allow(deprecated)]
-        match self {
-            Error::Fatal(err) => err.cause(),
-            Error::UserFacing(_) => None,
-            Error::Redirect(_) => None,
-        }
-    }
-}
-
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -107,43 +92,5 @@ impl Display for Error {
 impl From<anyhow::Error> for Error {
     fn from(error: anyhow::Error) -> Self {
         Error::Fatal(error)
-    }
-}
-
-pub(crate) async fn sheets_client(
-    session: &Session,
-    server_state: &ServerState,
-    original_uri: Uri,
-) -> Result<::sheets::Client, Error> {
-    let maybe_token: Option<String> = session
-        .get(GOOGLE_DRIVE_ACCESS_TOKEN_SESSION_KEY)
-        .await
-        .context("Session load error")?;
-
-    let redirect_uri = format!(
-        "{}/api/oauth-callbacks/google-drive",
-        server_state.config.public_base_url
-    );
-
-    if let Some(token) = maybe_token {
-        let client = ::sheets::Client::new(
-            server_state.config.google_sheets_client_id.clone(),
-            server_state.config.google_sheets_client_secret.to_string(),
-            redirect_uri,
-            token,
-            "",
-        );
-        Ok(client)
-    } else {
-        let state = Uuid::new_v4();
-        server_state
-            .auth_state_cache
-            .insert(state, original_uri)
-            .await;
-        let user_consent_url = format!(
-                "{}?client_id={}&access_type=offline&response_type=code&redirect_uri={}&state={}&scope=https://www.googleapis.com/auth/spreadsheets.readonly",
-                "https://accounts.google.com/o/oauth2/v2/auth", server_state.config.google_sheets_client_id, redirect_uri, state
-            );
-        Err(Error::Redirect(Redirect::to(&user_consent_url)))
     }
 }

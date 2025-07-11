@@ -2,30 +2,29 @@ use std::collections::BTreeMap;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use sheets::{spreadsheets::Spreadsheets, types::Sheet};
+use sheets::types::Sheet;
 
 use crate::{
     newtypes::{Email, GithubLogin},
-    sheets::cell_string,
+    sheets::{cell_string, SheetsClient},
     Error,
 };
 
 // TODO: Replace this with a serde implementation from a Google Sheet.
 pub(crate) async fn get_trainees(
-    client: sheets::Client,
+    client: SheetsClient,
     sheet_id: &str,
     extra_trainees: BTreeMap<GithubLogin, Trainee>,
 ) -> Result<BTreeMap<GithubLogin, Trainee>, Error> {
     const EXPECTED_SHEET_NAME: &str = "Form responses 1";
-    let data = Spreadsheets { client }
-        .get(sheet_id, true, &[])
-        .await
-        .with_context(|| {
+    let data = client.get(sheet_id, true, &[]).await.map_err(|err| {
+        err.with_context(|| {
             format!(
                 "Failed to get trainees github accounts sheet with id {}",
                 sheet_id
             )
-        })?;
+        })
+    })?;
     let sheet = data.body.sheets.into_iter().find(|sheet| {
         if let Some(properties) = &sheet.properties {
             properties.title == EXPECTED_SHEET_NAME
@@ -34,15 +33,17 @@ pub(crate) async fn get_trainees(
         }
     });
     if let Some(sheet) = sheet {
-        let data = trainees_from_sheet(&sheet, extra_trainees).with_context(|| {
-            format!(
-                "Failed to read trainees from sheet {}",
-                sheet
-                    .properties
-                    .map(|properties| properties.title)
-                    .as_deref()
-                    .unwrap_or("<unknown>")
-            )
+        let data = trainees_from_sheet(&sheet, extra_trainees).map_err(|err| {
+            err.with_context(|| {
+                format!(
+                    "Failed to read trainees from sheet {}",
+                    sheet
+                        .properties
+                        .map(|properties| properties.title)
+                        .as_deref()
+                        .unwrap_or("<unknown>")
+                )
+            })
         })?;
         Ok(data)
     } else {
