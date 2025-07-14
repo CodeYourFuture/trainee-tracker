@@ -15,3 +15,7 @@ RUN cargo +1.88.0 build --release --manifest-path=/tmp/src/Cargo.toml
 FROM scratch
 
 COPY --from=build /tmp/src/target/x86_64-unknown-linux-musl/release/trainee-tracker /trainee-tracker
+
+COPY config.proj.json /config.prod.json
+
+CMD ["/trainee-tracker", "/config.prod.json"]
