@@ -12,7 +12,7 @@ COPY . /tmp/src
 
 RUN cargo +1.88.0 build --release --manifest-path=/tmp/src/Cargo.toml
 
-FROM scratch
+FROM ubuntu:latest
 
 COPY --from=build /tmp/src/target/x86_64-unknown-linux-musl/release/trainee-tracker /trainee-tracker
 
