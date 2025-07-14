@@ -16,6 +16,6 @@ FROM scratch
 
 COPY --from=build /tmp/src/target/x86_64-unknown-linux-musl/release/trainee-tracker /trainee-tracker
 
-COPY config.proj.json /config.prod.json
+COPY config.prod.json /config.prod.json
 
 CMD ["/trainee-tracker", "/config.prod.json"]
