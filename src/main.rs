@@ -1,5 +1,6 @@
 use axum::routing::get;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
+use tracing::info;
 use tracing_subscriber::prelude::*;
 use trainee_tracker::{Config, ServerState};
 
@@ -89,6 +90,8 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(sock_addr)
         .await
         .expect("Failed to bind");
+
+    info!("Listening on {:?}", sock_addr);
 
     axum::serve(
         listener,
