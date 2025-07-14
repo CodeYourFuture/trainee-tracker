@@ -1,0 +1,108 @@
+{
+  "github_org": "CodeYourFuture",
+  "github_client_id": "Ov23liyZuouqyi9L3ZpM",
+  "github_client_secret": "$CYF_TRAINEE_TRACKER_GITHUB_CLIENT_SECRET",
+  "port": 3000,
+  "public_base_url": "https://trainee-tracker.hosting.codeyourfuture.io",
+  "google_sheets_client_id": "403459539948-q1psg497mlfk9u6cgf0eea5qum4gp92n.apps.googleusercontent.com",
+  "google_sheets_client_secret": "$CYF_TRAINEE_TRACKER_GOOGLE_SHEETS_CLIENT_SECRET",
+  "github_email_mapping_sheet_id": "1ahDEnO8odD9oLtO_EBcvcmEaF0qsX-I4iLCIY0XLjt0",
+
+  "courses": {
+    "itp": {
+      "register_sheet_id": "1YHKPCCN55PJD-o1jg4wbVKI3kbhB-ULiwB5hhG17DcA",
+      "batches": {
+        "itp-batch-2025-may": {
+          "start": "2025-05-01",
+          "end": "2025-08-31",
+          "sprints": {
+            "Module-Onboarding": [
+              "2025-05-10",
+              "2025-05-17",
+              "2025-05-24"
+            ],
+            "Module-Structuring-And-Testing-Data": [
+              "2025-05-31",
+              "2025-06-07",
+              "2025-06-14"
+            ],
+            "Module-Data-Groups": [
+              "2025-06-28",
+              "2025-07-05",
+              "2025-07-12"
+            ],
+            "Module-Data-Flows": [
+              "2025-07-19",
+              "2025-07-26",
+              "2025-08-02"
+            ]
+          }
+        }
+      }
+    },
+    "sdc": {
+      "register_sheet_id": "1dPY9Troijh3ZZkXbYkMMS3F5TkG4TKdRzd0Z3d45_gI",
+      "batches": {
+        "25-sdc-march": {
+          "start": "2025-03-01",
+          "end": "2025-06-30",
+          "sprints": {
+            "Module-Tools": [
+              "2025-03-01",
+              "2025-03-08",
+              "2025-03-15",
+              "2025-03-22"
+            ],
+            "Module-Logic": [
+              "2025-03-29"
+            ],
+            "Module-Decomposition": [
+              "2025-04-05",
+              "2025-04-26",
+              "2025-05-10",
+              "2025-05-17"
+            ],
+            "Module-Legacy-Code": [
+              "2025-05-31"
+            ],
+            "Module-Complexity": [
+              "2025-06-07",
+              "2025-06-14"
+            ]
+          }
+        },
+        "25-sdc-july": {
+          "start": "2025-07-01",
+          "end": "2025-10-31",
+          "sprints": {
+            "Module-Tools": [
+              "2025-07-12",
+              "2025-07-19",
+              "2025-07-26",
+              "2025-08-02"
+            ],
+            "Module-Logic": [
+              "2025-08-09"
+            ],
+            "Module-Decomposition": [
+              "2025-08-16",
+              "2025-08-30",
+              "2025-09-06",
+              "2025-09-13"
+            ],
+            "Module-Legacy-Code": [
+              "2025-09-20"
+            ],
+            "Module-Complexity": [
+              "2025-09-27",
+              "2025-10-04"
+            ]
+          }
+        }
+      }
+    }
+  },
+
+  "extra_trainee_github_mappings": {
+  }
+}
