@@ -67,7 +67,7 @@ async fn main() {
             get(trainee_tracker::endpoints::get_region),
         )
         .route(
-            "/api/oauth-callback",
+            "/api/oauth-callbacks/github",
             get(trainee_tracker::auth::handle_github_oauth_callback),
         )
         .route(

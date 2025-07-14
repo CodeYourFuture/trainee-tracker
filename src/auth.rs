@@ -47,7 +47,7 @@ pub(crate) async fn github_auth_redirect_url(
     original_uri: Uri,
 ) -> String {
     let uuid = Uuid::new_v4();
-    let redirect_url = format!("https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}/api/oauth-callback&scope=read:user&scope=read:org&state={}", server_state.config.github_client_id, server_state.config.public_base_url, uuid);
+    let redirect_url = format!("https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}/api/oauth-callbacks/github&scope=read:user&scope=read:org&state={}", server_state.config.github_client_id, server_state.config.public_base_url, uuid);
     server_state
         .auth_state_cache
         .insert(uuid, original_uri)
