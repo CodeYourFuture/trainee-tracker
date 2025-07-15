@@ -715,7 +715,7 @@ fn match_pr_to_assignment(
                 continue;
             }
         }
-        let mut pr_title_words = title_word_set(&pr.title);
+        let mut pr_title_words = title_word_set(pr.title.trim_end_matches('.'));
         if let Some(claimed_sprint_index) = claimed_sprint_index {
             let claimed_sprint_number = claimed_sprint_index + 1;
             pr_title_words.insert(format!("sprint{}", claimed_sprint_number));
