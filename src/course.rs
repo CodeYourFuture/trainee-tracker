@@ -283,6 +283,37 @@ pub struct TraineeWithSubmissions {
     pub modules: IndexMap<String, ModuleWithSubmissions>,
 }
 
+pub struct Fraction {
+    pub numerator: usize,
+    pub denominator: usize,
+}
+
+impl TraineeWithSubmissions {
+    pub fn attendance(&self) -> Fraction {
+        let mut numerator = 0;
+        let mut denominator = 0 ;
+        for submissions in self.modules.values() {
+            for sprint in &submissions.sprints {
+                for submission in &sprint.submissions {
+                    if let SubmissionState::Some(Submission::Attendance(attendance)) = submission {
+                        denominator += 1;
+                        match attendance {
+                            Attendance::OnTime { .. } | Attendance::Late { .. } => {
+                                numerator += 1;
+                            },
+                            Attendance::Absent { .. } => {},
+                        }
+                    }
+                }
+            }
+        }
+        Fraction {
+            numerator,
+            denominator,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ModuleWithSubmissions {
     pub sprints: Vec<SprintWithSubmissions>,
