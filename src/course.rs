@@ -7,7 +7,7 @@ use std::{
 use crate::{
     config::CourseScheduleWithRegisterSheetId,
     github_accounts::{get_trainees, Trainee},
-    newtypes::{Email, GithubLogin},
+    newtypes::{Email, GithubLogin, Region},
     octocrab::all_pages,
     prs::{get_prs, Pr},
     register::{get_register, Register},
@@ -45,11 +45,11 @@ impl CourseScheduleWithRegisterSheetId {
                 Module {
                     sprints: module_sprint_dates
                         .into_iter()
-                        .map(|date| Sprint {
+                        .map(|class_dates| Sprint {
                             assignments: vec![Assignment::Attendance {
-                                class_date: date.clone(),
+                                class_dates: class_dates.clone(),
                             }],
-                            date: date.clone(),
+                            dates: class_dates.clone(),
                         })
                         .collect(),
                 },
@@ -230,7 +230,7 @@ impl Module {
 #[derive(Clone, Serialize)]
 pub struct Sprint {
     pub assignments: Vec<Assignment>,
-    pub date: NaiveDate,
+    pub dates: BTreeMap<Region, NaiveDate>,
 }
 
 impl Sprint {
@@ -238,22 +238,38 @@ impl Sprint {
         self.assignments.len()
     }
 
-    pub fn is_in_past(&self) -> bool {
-        // TODO: Handle time zones
-        self.date <= Utc::now().date_naive()
+    pub fn is_in_past(&self, region: &Region) -> bool {
+        // TODO: Handle missing regions
+        if region.0 == "unknown" {
+            return true;
+        }
+        let date = self.dates.get(region);
+        if let Some(date) = date {
+            // TODO: Handle time zones
+            date <= &Utc::now().date_naive()
+        } else {
+            // TODO: Handle missing regions
+            true
+        }
     }
 }
 
 #[derive(Clone, Debug, Serialize)]
 pub enum Assignment {
-    Attendance { class_date: chrono::NaiveDate },
-    ExpectedPullRequest { title: String },
+    Attendance {
+        class_dates: BTreeMap<Region, chrono::NaiveDate>,
+    },
+    ExpectedPullRequest {
+        title: String,
+    },
 }
 
 impl Assignment {
     pub fn heading(&self) -> String {
         match self {
-            Assignment::Attendance { class_date } => format!("Attendance {class_date}"),
+            Assignment::Attendance {
+                class_dates: _class_dates,
+            } => "Attendance".to_owned(),
             Assignment::ExpectedPullRequest { title } => format!("PR: {title}"),
         }
     }
@@ -279,7 +295,7 @@ impl Batch {
 pub struct TraineeWithSubmissions {
     pub github_login: GithubLogin,
     pub name: String,
-    pub region: String,
+    pub region: Region,
     pub modules: IndexMap<String, ModuleWithSubmissions>,
 }
 
@@ -291,7 +307,7 @@ pub struct Fraction {
 impl TraineeWithSubmissions {
     pub fn attendance(&self) -> Fraction {
         let mut numerator = 0;
-        let mut denominator = 0 ;
+        let mut denominator = 0;
         for submissions in self.modules.values() {
             for sprint in &submissions.sprints {
                 for submission in &sprint.submissions {
@@ -300,8 +316,8 @@ impl TraineeWithSubmissions {
                         match attendance {
                             Attendance::OnTime { .. } | Attendance::Late { .. } => {
                                 numerator += 1;
-                            },
-                            Attendance::Absent { .. } => {},
+                            }
+                            Attendance::Absent { .. } => {}
                         }
                     }
                 }
@@ -493,8 +509,8 @@ pub async fn get_batch(
         let trainee_name =
             trainee_specific_info.map_or_else(|| "unknown".to_owned(), |t| t.name.clone());
         let trainee_email = trainee_specific_info.map(|t| t.email.clone());
-        let region =
-            trainee_specific_info.map_or_else(|| "unknown".to_owned(), |t| t.region.clone());
+        let region = trainee_specific_info
+            .map_or_else(|| Region("unknown".to_owned()), |t| t.region.clone());
 
         let mut modules = IndexMap::new();
         for (module_name, module) in &course.modules {
@@ -503,11 +519,13 @@ pub async fn get_batch(
                 module_name,
                 trainee_email.clone(),
                 &course,
+                &region,
             )?;
             let module_with_submissions = match_prs_to_assignments(
                 &module,
                 module_to_prs[&module_name].clone(),
                 module_attendance,
+                &region,
             )
             .map_err(|err| err.context("Failed to match PRs to assignments"))?;
 
@@ -530,6 +548,7 @@ fn get_trainee_module_attendance(
     module_name: &str,
     trainee_email: Option<Email>,
     course: &Course,
+    region: &Region,
 ) -> Result<Vec<SubmissionState>, Error> {
     if let Some(ref trainee_email) = trainee_email {
         let module_attendance = register_info.modules.get(module_name).with_context(|| {
@@ -551,8 +570,9 @@ fn get_trainee_module_attendance(
                     .assignments
                     .iter()
                     .filter_map(|assignment| {
-                        if let Assignment::Attendance { class_date } = assignment {
-                            Some(class_date.clone())
+                        if let Assignment::Attendance { class_dates } = assignment {
+                            // TODO: Handle missing regions
+                            Some(class_dates.get(region)?.clone())
                         } else {
                             None
                         }
@@ -566,7 +586,7 @@ fn get_trainee_module_attendance(
                                 date.clone(),
                                 NaiveTime::from_hms_opt(10, 00, 00).expect("TODO"),
                             ),
-                            chrono_tz::Europe::London.offset_from_utc_date(date),
+                            region.timezone().offset_from_utc_date(date),
                         )
                         .to_utc();
                         let attendance = module_attendance
@@ -579,7 +599,7 @@ fn get_trainee_module_attendance(
                                 SubmissionState::Some(Submission::Attendance(attendance))
                             }
                             None => {
-                                if sprint.is_in_past() {
+                                if sprint.is_in_past(region) {
                                     SubmissionState::Some(Submission::Attendance(
                                         Attendance::Absent {
                                             register_url: module_attendance.register_url.clone(),
@@ -606,12 +626,13 @@ pub fn match_prs_to_assignments(
     module: &Module,
     prs: Vec<Pr>,
     attendance: Vec<SubmissionState>,
+    region: &Region,
 ) -> Result<ModuleWithSubmissions, Error> {
     let mut sprints = Vec::with_capacity(module.sprints.len());
     for (sprint_index, sprint) in module.sprints.iter().enumerate() {
         sprints.push(SprintWithSubmissions {
             submissions: vec![
-                if sprint.is_in_past() {
+                if sprint.is_in_past(region) {
                     SubmissionState::MissingButExpected
                 } else {
                     SubmissionState::MissingButNotExpected
@@ -622,7 +643,7 @@ pub fn match_prs_to_assignments(
 
         for (assignment_index, assignment) in sprint.assignments.iter().enumerate() {
             if let Assignment::Attendance {
-                class_date: _class_date,
+                class_dates: _class_dates,
             } = assignment
             {
                 if let Some(submission_state) = attendance.get(sprint_index) {

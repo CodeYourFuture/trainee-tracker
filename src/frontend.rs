@@ -56,7 +56,12 @@ pub async fn list_courses(
                                     name: course_name.clone(),
                                     register_sheet_id: course.register_sheet_id.clone(),
                                 },
-                                batch_metadata,
+                                batch_metadata: batch_metadata
+                                    .into_iter()
+                                    .filter(|batch| {
+                                        course.batches.contains_key(&batch.github_team_slug)
+                                    })
+                                    .collect(),
                             },
                         )
                 })

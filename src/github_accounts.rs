@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use sheets::types::Sheet;
 
 use crate::{
-    newtypes::{Email, GithubLogin},
+    newtypes::{Email, GithubLogin, Region},
     sheets::{cell_string, SheetsClient},
     Error,
 };
@@ -58,7 +58,7 @@ pub(crate) async fn get_trainees(
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Trainee {
     pub name: String,
-    pub region: String,
+    pub region: Region,
     pub github_login: GithubLogin,
     pub email: Email,
 }
@@ -88,7 +88,9 @@ fn trainees_from_sheet(
                 github_login.clone(),
                 Trainee {
                     name: cell_string(&cells[1]).context("Failed to read trainee name")?,
-                    region: cell_string(&cells[2]).context("Failed to read trainee region")?,
+                    region: Region(
+                        cell_string(&cells[2]).context("Failed to read trainee region")?,
+                    ),
                     github_login,
                     email: Email(cell_string(&cells[4]).context("Failed to read trainee email")?),
                 },

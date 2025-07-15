@@ -185,7 +185,7 @@ pub async fn course_prs(
 
 #[derive(Serialize)]
 pub struct Region {
-    region: Option<String>,
+    region: Option<crate::newtypes::Region>,
 }
 
 pub async fn get_region(

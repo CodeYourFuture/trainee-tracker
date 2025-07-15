@@ -5,7 +5,10 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 use serde_env_field::EnvField;
 
-use crate::{github_accounts::Trainee, newtypes::GithubLogin};
+use crate::{
+    github_accounts::Trainee,
+    newtypes::{GithubLogin, Region},
+};
 
 #[derive(Clone, Deserialize)]
 pub struct Config {
@@ -79,8 +82,8 @@ impl Config {
 pub struct CourseSchedule {
     pub start: NaiveDate,
     pub end: NaiveDate,
-    // Module -> [Date]
-    pub sprints: IndexMap<String, Vec<NaiveDate>>,
+    // Module -> [{region: Date}]
+    pub sprints: IndexMap<String, Vec<BTreeMap<Region, NaiveDate>>>,
 }
 
 pub struct CourseScheduleWithRegisterSheetId {
