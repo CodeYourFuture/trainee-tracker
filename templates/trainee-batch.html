@@ -39,11 +39,13 @@
         <table>
             <tr>
                 <th>GitHub</th>
+                <th>Region</th>
                 {% for (module_name, module) in course.modules %}
                     <th colspan="{{ module.assignment_count() }}">{{module_name}}</th>
                 {% endfor %}
             </tr>
             <tr>
+                <th></th>
                 <th></th>
                 {% for (module_name, module) in course.modules %}
                     {% for (sprint_number, sprint) in module.sprints.iter().enumerate() %}
@@ -52,6 +54,7 @@
                 {% endfor %}
             </tr>
             <tr>
+                <th></th>
                 <th></th>
                 {% for (module_name, module) in course.modules %}
                     {% for sprint in module.sprints %}
@@ -64,6 +67,7 @@
             {% for trainee in batch.trainees %}
                 <tr>
                     <td>{{ trainee.github_login }} ({{ trainee.name }})</td>
+                    <td>{{ trainee.region }}</td>
                     {% for (module_name, module) in trainee.modules %}
                         {% for sprint in module.sprints %}
                             {% for submission in sprint.submissions %}

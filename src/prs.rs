@@ -62,7 +62,7 @@ pub struct Review {
     author: GithubLogin,
 }
 
-pub(crate) async fn get_prs(
+pub async fn get_prs(
     octocrab: &Octocrab,
     org_name: String,
     module: String,

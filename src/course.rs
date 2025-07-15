@@ -36,18 +36,8 @@ impl CourseScheduleWithRegisterSheetId {
         octocrab: &Octocrab,
         github_org: String,
     ) -> Result<Course, Error> {
-        let mut module_futures = Vec::new();
-        for module_name in self.module_names() {
-            module_futures.push(all_pages("issues", octocrab, async || {
-                octocrab
-                    .issues(github_org.clone(), module_name)
-                    .list()
-                    .send()
-                    .await
-            }))
-        }
-
         let mut modules = IndexMap::new();
+        let mut module_futures = Vec::new();
 
         for (module_name, module_sprint_dates) in &self.course_schedule.sprints {
             modules.insert(
@@ -64,34 +54,30 @@ impl CourseScheduleWithRegisterSheetId {
                         .collect(),
                 },
             );
+            module_futures.push(Self::fetch_module_assignments(
+                octocrab,
+                github_org.clone(),
+                module_name.clone(),
+                module_sprint_dates.len(),
+            ));
         }
 
-        let module_issues = join_all(module_futures)
-            .await
+        for (module_name, sprints_module_assignments) in self
+            .module_names()
             .into_iter()
-            .collect::<Result<Vec<Vec<Issue>>, Error>>()
-            .map_err(|err| err.context("Failed to fetch module issues"))?;
-        for (module_name, mut issues) in self.module_names().into_iter().zip(module_issues) {
-            // UNWRAP: By construction above.
-            let module = modules.get_mut(&module_name).unwrap();
-
-            issues.sort_by_cached_key(|&Issue { ref title, .. }| title.clone());
-
-            for issue in issues {
-                if let Some((sprint_number, assignment)) = parse_issue(&issue)? {
-                    let sprint_index = usize::from(sprint_number) - 1;
-                    if module.sprints.len() <= sprint_index {
-                        return Err(Error::Fatal(anyhow::anyhow!(
-                            "Found issue {} in sprint {} but module only has {} sprints",
-                            issue.html_url,
-                            sprint_number,
-                            module.sprints.len()
-                        )));
-                    }
-                    if let Some(assignment) = assignment {
-                        module.sprints[sprint_index].assignments.push(assignment);
-                    }
-                }
+            .zip(join_all(module_futures).await.into_iter())
+        {
+            for (module_sprint, module_assignments) in
+                modules[&module_name]
+                    .sprints
+                    .iter_mut()
+                    .zip(sprints_module_assignments.map_err(|err| {
+                        err.with_context(|| {
+                            format!("Failed to fetch issues for module {}", module_name)
+                        })
+                    })?)
+            {
+                module_sprint.assignments.extend(module_assignments);
             }
         }
 
@@ -102,6 +88,43 @@ impl CourseScheduleWithRegisterSheetId {
             start_date: self.course_schedule.start,
             end_date: self.course_schedule.end,
         })
+    }
+
+    pub async fn fetch_module_assignments(
+        octocrab: &Octocrab,
+        github_org: String,
+        module_name: String,
+        sprint_count: usize,
+    ) -> Result<Vec<Vec<Assignment>>, Error> {
+        let mut sprints = std::iter::repeat_with(Vec::new)
+            .take(sprint_count)
+            .collect::<Vec<_>>();
+
+        let mut issues = all_pages("issues", octocrab, async || {
+            octocrab.issues(github_org, module_name).list().send().await
+        })
+        .await
+        .map_err(|err| err.context("Failed to fetch module issues"))?;
+
+        issues.sort_by_cached_key(|&Issue { ref title, .. }| title.clone());
+
+        for issue in issues {
+            if let Some((sprint_number, assignment)) = parse_issue(&issue)? {
+                let sprint_index = usize::from(sprint_number) - 1;
+                if sprints.len() <= sprint_index {
+                    return Err(Error::Fatal(anyhow::anyhow!(
+                        "Found issue {} in sprint {} but module only has {} sprints",
+                        issue.html_url,
+                        sprint_number,
+                        sprints.len()
+                    )));
+                }
+                if let Some(assignment) = assignment {
+                    sprints[sprint_index].push(assignment);
+                }
+            }
+        }
+        Ok(sprints)
     }
 }
 
@@ -221,7 +244,7 @@ impl Sprint {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub enum Assignment {
     Attendance { class_date: chrono::NaiveDate },
     ExpectedPullRequest { title: String },
@@ -256,6 +279,7 @@ impl Batch {
 pub struct TraineeWithSubmissions {
     pub github_login: GithubLogin,
     pub name: String,
+    pub region: String,
     pub modules: IndexMap<String, ModuleWithSubmissions>,
 }
 
@@ -438,6 +462,8 @@ pub async fn get_batch(
         let trainee_name =
             trainee_specific_info.map_or_else(|| "unknown".to_owned(), |t| t.name.clone());
         let trainee_email = trainee_specific_info.map(|t| t.email.clone());
+        let region =
+            trainee_specific_info.map_or_else(|| "unknown".to_owned(), |t| t.region.clone());
 
         let mut modules = IndexMap::new();
         for (module_name, module) in &course.modules {
@@ -459,6 +485,7 @@ pub async fn get_batch(
         let trainee = TraineeWithSubmissions {
             github_login,
             name: trainee_name,
+            region,
             modules,
         };
         trainees.push(trainee);
@@ -544,7 +571,7 @@ fn get_trainee_module_attendance(
     }
 }
 
-fn match_prs_to_assignments(
+pub fn match_prs_to_assignments(
     module: &Module,
     prs: Vec<Pr>,
     attendance: Vec<SubmissionState>,
@@ -581,7 +608,7 @@ fn match_prs_to_assignments(
             .split("|")
             .map(|title| title.trim())
             .collect::<Vec<_>>();
-        let mut sprint = None;
+        let mut sprint_index = None;
         for title_part in title_parts {
             if title_part.starts_with("sprint") || title_part.starts_with("week") {
                 let number_regex = Regex::new(r"(\d+)").unwrap();
@@ -596,44 +623,17 @@ fn match_prs_to_assignments(
                         return Err(Error::Fatal(anyhow::anyhow!("Sprint number was impractical - expected something between 1 and 20 but was {}", number)));
                     }
 
-                    sprint = Some(number - 1);
+                    sprint_index = Some(number - 1);
                 }
             }
         }
-        if let Some(sprint) = sprint {
-            if sprints.len() <= sprint {
-                unknown_prs.push(pr);
-            } else {
-                let pr_title_words = title_word_set(&pr.title);
-                let mut best_match: Option<(usize, usize)> = None;
-                for (index, assignment) in module.sprints[sprint].assignments.iter().enumerate() {
-                    match assignment {
-                        Assignment::ExpectedPullRequest {
-                            title: expected_title,
-                        } => {
-                            let assignment_title_words = title_word_set(expected_title);
-                            let common_word_count =
-                                assignment_title_words.intersection(&pr_title_words).count();
-                            if sprints[sprint].submissions[index].is_missing()
-                                && (best_match.is_none()
-                                    || common_word_count > best_match.unwrap().0)
-                            {
-                                best_match = Some((common_word_count, index));
-                            }
-                        }
-                        Assignment::Attendance { .. } => {}
-                    }
-                }
-                if let Some((_, index)) = best_match {
-                    sprints[sprint].submissions[index] =
-                        SubmissionState::Some(Submission::PullRequest { pull_request: pr });
-                } else {
-                    unknown_prs.push(pr);
-                }
-            }
-        } else {
-            unknown_prs.push(pr);
-        }
+        match_pr_to_assignment(
+            pr,
+            sprint_index,
+            &module.sprints,
+            &mut sprints,
+            &mut unknown_prs,
+        );
     }
 
     Ok(ModuleWithSubmissions {
@@ -642,12 +642,87 @@ fn match_prs_to_assignments(
     })
 }
 
+fn match_pr_to_assignment(
+    pr: Pr,
+    claimed_sprint_index: Option<usize>,
+    assignments: &Vec<Sprint>,
+    submissions: &mut Vec<SprintWithSubmissions>,
+    unknown_prs: &mut Vec<Pr>,
+) {
+    #[derive(Clone, Copy)]
+    struct Match {
+        match_count: usize,
+        sprint_index: usize,
+        assignment_index: usize,
+    }
+
+    let mut best_match: Option<Match> = None;
+    for (sprint_index, sprint) in assignments.iter().enumerate() {
+        if let Some(claimed_sprint_index) = claimed_sprint_index {
+            if claimed_sprint_index != sprint_index {
+                continue;
+            }
+        }
+        let mut pr_title_words = title_word_set(&pr.title);
+        if let Some(claimed_sprint_index) = claimed_sprint_index {
+            let claimed_sprint_number = claimed_sprint_index + 1;
+            pr_title_words.insert(format!("sprint{}", claimed_sprint_number));
+        }
+
+        for (assignment_index, assignment) in sprint.assignments.iter().enumerate() {
+            match assignment {
+                Assignment::ExpectedPullRequest {
+                    title: expected_title,
+                } => {
+                    let mut assignment_title_words = title_word_set(expected_title);
+                    if let Some(claimed_sprint_index) = claimed_sprint_index {
+                        let claimed_sprint_number = claimed_sprint_index + 1;
+                        if assignment_title_words.contains("sprint") {
+                            assignment_title_words
+                                .insert(format!("sprint{}", claimed_sprint_number));
+                            assignment_title_words.insert(format!("week{}", claimed_sprint_number));
+                        }
+                    }
+                    let match_count = assignment_title_words.intersection(&pr_title_words).count();
+                    if submissions[sprint_index].submissions[assignment_index].is_missing()
+                        && match_count
+                            > best_match
+                                .as_ref()
+                                .map(|best_match| best_match.match_count)
+                                .unwrap_or_default()
+                    {
+                        best_match = Some(Match {
+                            match_count,
+                            sprint_index,
+                            assignment_index,
+                        });
+                    }
+                }
+                Assignment::Attendance { .. } => {}
+            }
+        }
+    }
+    if let Some(Match {
+        sprint_index,
+        assignment_index,
+        ..
+    }) = best_match
+    {
+        submissions[sprint_index].submissions[assignment_index] =
+            SubmissionState::Some(Submission::PullRequest { pull_request: pr });
+    } else {
+        unknown_prs.push(pr);
+    }
+}
+
 fn title_word_set(title: &str) -> IndexSet<String> {
     title
         .to_lowercase()
         .split(" ")
         .flat_map(|word| word.split("_"))
         .flat_map(|word| word.split("-"))
+        .flat_map(|word| word.split("/"))
+        .flat_map(|word| word.split("|"))
         .map(|s| s.to_owned())
         .collect()
 }
