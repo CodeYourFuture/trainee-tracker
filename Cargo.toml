@@ -2,7 +2,7 @@
 name = "trainee-tracker"
 version = "0.1.0"
 edition = "2021"
-default-run = "trainee_tracker"
+default-run = "trainee-tracker"
 
 [dependencies]
 anyhow = "1"
