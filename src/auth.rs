@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context};
 use askama::Template;
 use axum::{
     extract::{Query, State},
-    response::{Html, Redirect},
+    response::Html,
 };
 use http::Uri;
 use serde::Deserialize;
@@ -25,7 +25,7 @@ pub async fn handle_github_oauth_callback(
     State(server_state): State<ServerState>,
     session: Session,
     params: Query<OauthCallbackParams>,
-) -> Result<String, Error> {
+) -> Result<Html<String>, Error> {
     let access_token =
         exchange_github_oauth_code_for_access_token(&server_state.config, &params.code)
             .await
@@ -36,7 +36,11 @@ pub async fn handle_github_oauth_callback(
         .context("Session load error")?;
     let redirect_uri = server_state.auth_state_cache.remove(&params.state).await;
     if let Some(redirect_uri) = redirect_uri {
-        Err(Error::Redirect(Redirect::to(&redirect_uri.to_string())))
+        Ok(Html(
+            crate::frontend::Redirect { redirect_uri }
+                .render()
+                .context("Failed to render")?,
+        ))
     } else {
         Err(Error::Fatal(anyhow!("Unrecognised state")))
     }
