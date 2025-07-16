@@ -277,8 +277,9 @@ dependencies = [
 
 [[package]]
 name = "case_insensitive_string"
-version = "0.2.9"
-source = "git+https://github.com/illicitonion/case_insensitive_string.git?rev=8195ff87de51a965d80391af4af94cfd64db1fc3#8195ff87de51a965d80391af4af94cfd64db1fc3"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca6260a8cc32da29c626ce456aad5c579c3a36294722f00cccceeb64968820f7"
 dependencies = [
  "compact_str",
  "serde",
