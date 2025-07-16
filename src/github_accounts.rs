@@ -81,8 +81,9 @@ fn trainees_from_sheet(
                 return Err(Error::Fatal(anyhow::anyhow!("Reading trainee data from Google Sheets API, row {} didn't have at least 5 columns", row_index)));
             }
 
-            let github_login =
-                GithubLogin(cell_string(&cells[3]).context("Failed to read trainee github login")?);
+            let github_login = GithubLogin::from(
+                cell_string(&cells[3]).context("Failed to read trainee github login")?,
+            );
 
             trainees.insert(
                 github_login.clone(),

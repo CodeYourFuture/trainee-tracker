@@ -468,7 +468,7 @@ pub async fn get_batch(
 
     let member_logins = members
         .iter()
-        .map(|Author { login, .. }| GithubLogin(login.clone()))
+        .map(|Author { login, .. }| GithubLogin::from(login.clone()))
         .collect::<BTreeSet<_>>();
 
     let pr_futures = course

@@ -203,7 +203,7 @@ pub async fn get_region(
     .await?;
     Ok(Json(Region {
         region: trainees
-            .get(&GithubLogin(github_login))
+            .get(&GithubLogin::from(github_login))
             .map(|trainee| trainee.region.clone()),
     }))
 }

@@ -90,7 +90,7 @@ pub async fn get_prs(
                  ..
              }| {
                 // If a user is deleted from GitHub, their User will be None - ignore PRs from deleted users.
-                let author = GithubLogin(user?.login);
+                let author = GithubLogin::from(user?.login);
                 let state = PrState::from(labels);
                 // For some reason repo is generally None, but we know it, so...
                 let repo_name = module.clone();
@@ -336,7 +336,7 @@ async fn get_full_page(
                      }| {
                         user.map(|Author { login, .. }| Review {
                             created_at,
-                            author: GithubLogin(login),
+                            author: GithubLogin::from(login),
                         })
                     },
                 )
@@ -362,7 +362,7 @@ async fn get_full_page(
                         match (submitted_at, user) {
                             (Some(created_at), Some(Author { login, .. })) => Some(Review {
                                 created_at,
-                                author: GithubLogin(login),
+                                author: GithubLogin::from(login),
                             }),
                             _ => None,
                         }
