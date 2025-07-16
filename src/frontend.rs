@@ -103,7 +103,7 @@ pub async fn get_trainee_batch(
     let course = course_schedule
         .with_assignments(&octocrab, github_org.clone())
         .await?;
-    let batch = get_batch(
+    let mut batch = get_batch(
         &octocrab,
         sheets_client,
         &server_state.config.github_email_mapping_sheet_id,
@@ -113,6 +113,10 @@ pub async fn get_trainee_batch(
         server_state.config.extra_trainee_github_mappings,
     )
     .await?;
+    batch
+        .trainees
+        .sort_by_cached_key(|trainee| trainee.progress_score());
+    batch.trainees.reverse();
     Ok(Html(
         TraineeBatchTemplate { course, batch }.render().unwrap(),
     ))

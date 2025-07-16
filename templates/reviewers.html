@@ -39,7 +39,7 @@
                         <details>
                             <summary><span class="total-reviewed-prs">{{ reviewer.prs.len() }}</span> reviewed PRs</summary>
                             <ul class="pr-list">
-                                {% for pr in reviewer.prs %}<li><a href="{{ pr.pr.url }}">#{{ pr.pr.number }}</a></li>{% endfor %}
+                                {% for pr in reviewer.prs %}<li><a href="{{ pr.pr.url }}">{{ pr.pr.repo_name }} #{{ pr.pr.number }}</a></li>{% endfor %}
                             </ul>
                         </details>
                     </div>

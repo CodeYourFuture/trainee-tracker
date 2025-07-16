@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     num::NonZeroUsize,
     str::FromStr,
 };
@@ -9,7 +9,7 @@ use crate::{
     github_accounts::{get_trainees, Trainee},
     newtypes::{Email, GithubLogin, Region},
     octocrab::all_pages,
-    prs::{get_prs, Pr},
+    prs::{get_prs, Pr, PrState},
     register::{get_register, Register},
     sheets::SheetsClient,
     Error,
@@ -19,6 +19,7 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
 use futures::future::join_all;
 use indexmap::{IndexMap, IndexSet};
+use maplit::btreemap;
 use octocrab::{
     models::{issues::Issue, teams::RequestedTeam, Author},
     Octocrab,
@@ -254,7 +255,7 @@ impl Sprint {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub enum Assignment {
     Attendance {
         class_dates: BTreeMap<Region, chrono::NaiveDate>,
@@ -289,14 +290,77 @@ impl Batch {
             .flat_map(|ModuleWithSubmissions { unknown_prs, .. }| unknown_prs.iter().cloned())
             .collect()
     }
+
+    pub fn all_regions(&self) -> Vec<Region> {
+        let mut region_counts: HashMap<_, usize> = HashMap::new();
+        for trainee in &self.trainees {
+            let count = region_counts.entry(trainee.region.clone()).or_default();
+            *count = *count + 1;
+        }
+        let mut region_counts = region_counts.into_iter().collect::<Vec<_>>();
+        region_counts.sort_by_key(|(_region, count)| *count);
+        region_counts
+            .into_iter()
+            .map(|(region, _count)| region)
+            .collect()
+    }
 }
 
 #[derive(Debug)]
 pub struct TraineeWithSubmissions {
     pub github_login: GithubLogin,
     pub name: String,
+    pub email: Email,
     pub region: Region,
     pub modules: IndexMap<String, ModuleWithSubmissions>,
+}
+
+impl TraineeWithSubmissions {
+    // This whole calculation is super ad-hoc, we should feel free to tweak this whole process and these parameters however we find useful.
+    pub fn progress_score(&self) -> u64 {
+        let mut numerator = 0_u64;
+        let mut denominator = 0_u64;
+        for module in self.modules.values() {
+            for sprint in &module.sprints {
+                for submission in &sprint.submissions {
+                    match submission {
+                        SubmissionState::Some(Submission::Attendance(attendance)) => {
+                            denominator += 10;
+                            match attendance {
+                                Attendance::OnTime { .. } => {
+                                    numerator += 10;
+                                }
+                                Attendance::Late { .. } => {
+                                    numerator += 8;
+                                }
+                                Attendance::Absent { .. } => {}
+                            }
+                        }
+                        SubmissionState::Some(Submission::PullRequest { pull_request }) => {
+                            denominator += 10;
+                            match pull_request.state {
+                                PrState::Complete => {
+                                    numerator += 10;
+                                }
+                                PrState::NeedsReview | PrState::Reviewed => {
+                                    numerator += 6;
+                                }
+                                PrState::Unknown => {
+                                    numerator += 2;
+                                }
+                            }
+                        }
+                        SubmissionState::MissingButExpected(assignment) => match assignment {
+                            Assignment::Attendance { .. } => denominator += 20,
+                            Assignment::ExpectedPullRequest { .. } => denominator += 10,
+                        },
+                        SubmissionState::MissingButNotExpected(_) => {}
+                    }
+                }
+            }
+        }
+        10000 * numerator / denominator
+    }
 }
 
 pub struct Fraction {
@@ -344,16 +408,16 @@ pub struct SprintWithSubmissions {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SubmissionState {
     Some(Submission),
-    MissingButExpected,
-    MissingButNotExpected,
+    MissingButExpected(Assignment),
+    MissingButNotExpected(Assignment),
 }
 
 impl SubmissionState {
     fn is_missing(&self) -> bool {
         match self {
             Self::Some(_) => false,
-            Self::MissingButExpected => true,
-            Self::MissingButNotExpected => true,
+            Self::MissingButExpected(_) => true,
+            Self::MissingButNotExpected(_) => true,
         }
     }
 }
@@ -534,6 +598,7 @@ pub async fn get_batch(
         let trainee = TraineeWithSubmissions {
             github_login,
             name: trainee_name,
+            email: trainee_email.unwrap_or_else(|| Email("unknown".to_owned())),
             region,
             modules,
         };
@@ -606,12 +671,16 @@ fn get_trainee_module_attendance(
                                         },
                                     ))
                                 } else {
-                                    SubmissionState::MissingButNotExpected
+                                    SubmissionState::MissingButNotExpected(Assignment::Attendance {
+                                        class_dates: btreemap! { region.clone() => date.clone() },
+                                    })
                                 }
                             }
                         }
                     }
-                    _ => SubmissionState::MissingButNotExpected,
+                    _ => SubmissionState::MissingButNotExpected(Assignment::Attendance {
+                        class_dates: BTreeMap::new(),
+                    }),
                 };
                 attendance
             })
@@ -633,9 +702,13 @@ pub fn match_prs_to_assignments(
         sprints.push(SprintWithSubmissions {
             submissions: vec![
                 if sprint.is_in_past(region) {
-                    SubmissionState::MissingButExpected
+                    SubmissionState::MissingButExpected(Assignment::Attendance {
+                        class_dates: sprint.dates.clone(),
+                    })
                 } else {
-                    SubmissionState::MissingButNotExpected
+                    SubmissionState::MissingButNotExpected(Assignment::Attendance {
+                        class_dates: sprint.dates.clone(),
+                    })
                 };
                 sprint.assignment_count()
             ],

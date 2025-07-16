@@ -24,6 +24,7 @@ hyper-rustls = { version = "0.27.7", default-features = false, features = [
 ] }
 hyper-util = "0.1.14"
 indexmap = { version = "2.9.0", features = ["serde"] }
+maplit = "1.0.2"
 moka = { version = "0.12.10", features = ["future"] }
 octocrab = "0.44.1"
 octocrab-rate-limiter = "0.1.0"

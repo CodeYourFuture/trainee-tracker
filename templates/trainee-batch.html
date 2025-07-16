@@ -12,7 +12,7 @@
                 background-color: rgba(68, 238, 142, 0.5);
             }
             td.attendance-late {
-                background-color: #ee784480;
+                background-color: #e6f4ae;
             }
             td.attendance-unknown {
                 background-color: grey;
@@ -36,6 +36,11 @@
     </head>
     <body>
         <h1>{{ course.name }} - {{ batch.name }}</h1>
+        <button id="regions-filter-all">All Regions</button>
+        {% for region in batch.all_regions() %}
+            <input type="checkbox" checked="checked" name="region-checkbox" value="{{ region }}" /> {{ region }}
+        {% endfor %}
+        <button id="regions-filter-none">No Regions</button>
         <table>
             <tr>
                 <th>GitHub</th>
@@ -66,7 +71,7 @@
             </tr>
             {% for trainee in batch.trainees %}
                 <tr>
-                    <td>{{ trainee.github_login }} ({{ trainee.name }}) ({{ trainee.attendance().numerator }} / {{ trainee.attendance().denominator }})</td>
+                    <td>{{ trainee.name }} - <a href="https://github.com/{{trainee.github_login}}">@{{ trainee.github_login }}</a> - {{ trainee.email }}</td>
                     <td>{{ trainee.region }}</td>
                     {% for (module_name, module) in trainee.modules %}
                         {% for sprint in module.sprints %}
@@ -74,9 +79,9 @@
                                 {% match submission %}
                                     {% when crate::course::SubmissionState::Some(submission) %}
                                       <td class="{{ css_classes(submission) }}"><a href="{{ submission.link() }}">{{ submission.display_text() }}</a></td>
-                                    {% when crate::course::SubmissionState::MissingButExpected %}
+                                    {% when crate::course::SubmissionState::MissingButExpected(_) %}
                                       <td class="pr-missing"></td>
-                                    {% when crate::course::SubmissionState::MissingButNotExpected %}
+                                    {% when crate::course::SubmissionState::MissingButNotExpected(_) %}
                                       <td></td>
                                 {% endmatch %}
                             {% endfor %}
@@ -95,5 +100,34 @@
                 {% endfor %}
             </ul>
         {% endif %}
+        <script type="text/javascript">
+            const updateFilters = () => {
+                const regionToShow = {};
+                for (const checkbox of document.getElementsByName("region-checkbox")) {
+                    regionToShow[checkbox.value] = checkbox.checked;
+                }
+                for (const row of Array.from(document.getElementsByTagName("tr")).slice(3)) {
+                    const region = row.getElementsByTagName("td")[1].textContent;
+                    row.style.display = regionToShow[region] ? "table-row" : "none";
+                }
+            };
+            const showAll = (event) => {
+                for (const element of document.getElementsByName("region-checkbox")) {
+                    element.checked = true;
+                }
+                updateFilters();
+            };
+            const hideAll = (event) => {
+                for (const element of document.getElementsByName("region-checkbox")) {
+                    element.checked = false;
+                }
+                updateFilters();
+            };
+            document.getElementById("regions-filter-all").addEventListener("click", showAll);
+            document.getElementById("regions-filter-none").addEventListener("click", hideAll);
+            for (const checkbox of document.getElementsByName("region-checkbox")) {
+                checkbox.addEventListener("click", updateFilters);
+            }
+        </script>
     </body>
 </html>
