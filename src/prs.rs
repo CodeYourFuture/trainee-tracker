@@ -216,7 +216,14 @@ pub(crate) struct ReviewerInfo {
     pub prs: Vec<ReviewedPr>,
     pub login: GithubLogin,
     pub reviews_days_in_last_28_days: u8,
-    pub staff_only_details: Option<ReviewerStaffOnlyDetails>,
+    pub staff_only_details: MaybeReviewerStaffOnlyDetails,
+}
+
+#[derive(PartialEq, Eq, Serialize)]
+pub(crate) enum MaybeReviewerStaffOnlyDetails {
+    Some(ReviewerStaffOnlyDetails),
+    Unknown,
+    NotAuthenticated,
 }
 
 impl PartialOrd for ReviewerInfo {
@@ -291,7 +298,7 @@ pub(crate) async fn get_reviewers(
                             prs: Vec::new(),
                             login: review.author.clone(),
                             reviews_days_in_last_28_days: 0,
-                            staff_only_details: None,
+                            staff_only_details: MaybeReviewerStaffOnlyDetails::NotAuthenticated,
                         });
                 if review.created_at > reviewer_info.last_review {
                     reviewer_info.last_review = review.created_at;

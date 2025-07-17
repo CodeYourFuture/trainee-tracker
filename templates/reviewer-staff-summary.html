@@ -1,21 +1,25 @@
-{% if let Some(staff_only_details) = reviewer.staff_only_details %}
-{% if staff_only_details.attended_training %}<span title="Attended training">🎓</span>{% else %}<span class="Hasn't attended training">❌</span>{% endif %}
-{% match staff_only_details.checked %}
-  {% when crate::prs::CheckStatus::CheckedAndOk %}
-  <span title="Checked PRs">✅</span>
-  {% when crate::prs::CheckStatus::CheckedAndCheckAgain %}
-  <span title="Need to check PRs again">👀</span>
-  {% when crate::prs::CheckStatus::Unchecked %}
-  <span title="Haven't checked PRs">❓</span>
+{% match reviewer.staff_only_details %}
+  {% when crate::prs::MaybeReviewerStaffOnlyDetails::Some(staff_only_details) %}
+    {% if staff_only_details.attended_training %}<span title="Attended training">🎓</span>{% else %}<span class="Hasn't attended training">❌</span>{% endif %}
+    {% match staff_only_details.checked %}
+      {% when crate::prs::CheckStatus::CheckedAndOk %}
+        <span title="Checked PRs">✅</span>
+      {% when crate::prs::CheckStatus::CheckedAndCheckAgain %}
+        <span title="Need to check PRs again">👀</span>
+      {% when crate::prs::CheckStatus::Unchecked %}
+        <span title="Haven't checked PRs">❓</span>
+    {% endmatch %}
+    {% match staff_only_details.quality.as_str() %}
+      {% when "Great" %}
+        👍
+      {% when "Ok" %}
+        🆗
+      {% when "Bad" %}
+        👎
+      {% else %}
+        ❓
+      {% endmatch %}
+  {% when crate::prs::MaybeReviewerStaffOnlyDetails::Unknown %}
+    ❓❓❓
+  {% when crate::prs::MaybeReviewerStaffOnlyDetails::NotAuthenticated %}
 {% endmatch %}
-{% match staff_only_details.quality.as_str() %}
-  {% when "Great" %}
-  👍
-  {% when "Ok" %}
-  🆗
-  {% when "Bad" %}
-  👎
-  {% else %}
-  ❓
-{% endmatch %}
-{% endif %}

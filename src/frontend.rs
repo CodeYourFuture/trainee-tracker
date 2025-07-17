@@ -17,7 +17,7 @@ use crate::{
         fetch_batch_metadata, get_batch, Attendance, Batch, BatchMetadata, Course, Submission,
     },
     octocrab::octocrab,
-    prs::{PrState, ReviewerInfo},
+    prs::{MaybeReviewerStaffOnlyDetails, PrState, ReviewerInfo},
     reviewer_staff_info::get_reviewer_staff_info,
     sheets::sheets_client,
     Error, ServerState,
@@ -149,7 +149,7 @@ impl TraineeBatchTemplate {
 
 #[derive(Deserialize)]
 pub struct ReviewerParams {
-    staff: bool,
+    staff: Option<bool>,
 }
 
 pub async fn get_reviewers(
@@ -159,7 +159,8 @@ pub async fn get_reviewers(
     Path(course): Path<String>,
     Query(reviewer_params): Query<ReviewerParams>,
 ) -> Result<Html<String>, Error> {
-    let mut staff_details = if reviewer_params.staff {
+    let is_staff = reviewer_params.staff.unwrap_or(false);
+    let mut staff_details = if is_staff {
         let sheets_client =
             sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
         get_reviewer_staff_info(
@@ -181,7 +182,14 @@ pub async fn get_reviewers(
         .await?
         .into_iter()
         .map(|mut reviewer| {
-            reviewer.staff_only_details = staff_details.remove(&reviewer.login);
+            reviewer.staff_only_details = if is_staff {
+                match staff_details.remove(&reviewer.login) {
+                    Some(details) => MaybeReviewerStaffOnlyDetails::Some(details),
+                    None => MaybeReviewerStaffOnlyDetails::Unknown,
+                }
+            } else {
+                MaybeReviewerStaffOnlyDetails::NotAuthenticated
+            };
             reviewer
         })
         .collect();
