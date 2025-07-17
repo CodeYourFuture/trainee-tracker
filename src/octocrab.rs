@@ -33,7 +33,7 @@ pub(crate) async fn octocrab(
         octocrab_for_token(token)
     } else {
         Err(Error::Redirect(
-            github_auth_redirect_url(server_state, original_uri).await,
+            github_auth_redirect_url(server_state, original_uri).await?,
         ))
     }
 }

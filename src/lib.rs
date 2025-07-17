@@ -39,7 +39,7 @@ impl ServerState {
 pub enum Error {
     UserFacing(String),
     Fatal(anyhow::Error),
-    Redirect(String),
+    Redirect(Uri),
 }
 
 impl Error {
