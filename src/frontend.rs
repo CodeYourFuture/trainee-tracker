@@ -6,7 +6,6 @@ use axum::{
     response::Html,
 };
 use futures::future::join_all;
-use http::Uri;
 use tower_sessions::Session;
 
 use crate::{
@@ -184,18 +183,18 @@ pub async fn index(
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
 ) -> Result<Html<String>, Error> {
-    let login_url = github_auth_redirect_url(&server_state, original_uri).await?;
+    let login_url = github_auth_redirect_url(&server_state, original_uri).await;
     Ok(Html(Index { login_url }.render().unwrap()))
 }
 
 #[derive(Template)]
 #[template(path = "index.html")]
 struct Index {
-    pub login_url: Uri,
+    pub login_url: String,
 }
 
 #[derive(Template)]
 #[template(path = "redirect.html")]
 pub(crate) struct Redirect {
-    pub redirect_uri: Uri,
+    pub redirect_uri: String,
 }
