@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <script type="text/javascript">window.location = "{{ redirect_uri }}";</script>
+        <script type="text/javascript">window.location = "{{ redirect_uri | safe }}";</script>
     </head>
     <body>
-        You should be redirected. If you are not, please <a href="{{ redirect_uri }}">click here to be redirected</a>.
+        You should be redirected. If you are not, please <a href="{{ redirect_uri | safe }}">click here to be redirected</a>.
     </body>
 </html>
