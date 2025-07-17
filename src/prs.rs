@@ -4,9 +4,11 @@ use anyhow::Context;
 use chrono::{DateTime, TimeDelta};
 use futures::future::join_all;
 use octocrab::models::pulls::{Comment, PullRequest, Review as OctoReview};
-use octocrab::models::{Author, Label};
+use octocrab::models::{Author, IssueState, Label};
+use octocrab::params::State;
 use octocrab::Octocrab;
 use serde::Serialize;
+use tracing::info;
 
 use crate::newtypes::GithubLogin;
 use crate::Error;
@@ -20,6 +22,7 @@ pub struct Pr {
     pub author: GithubLogin,
     pub state: PrState,
     pub updated_at: DateTime<chrono::Utc>,
+    pub is_closed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -70,6 +73,7 @@ pub async fn get_prs(
     let page = octocrab
         .pulls(org_name, module.clone())
         .list()
+        .state(State::All)
         .send()
         .await
         .context("Failed to get PRs")?;
@@ -87,11 +91,18 @@ pub async fn get_prs(
                  labels,
                  updated_at,
                  title,
+                 state,
                  ..
              }| {
                 // If a user is deleted from GitHub, their User will be None - ignore PRs from deleted users.
                 let author = GithubLogin::from(user?.login);
-                let state = PrState::from(labels);
+                let pr_state = PrState::from(labels);
+
+                let is_closed = state.unwrap_or(IssueState::Open) == IssueState::Closed;
+                if is_closed && pr_state != PrState::Complete {
+                    return None;
+                }
+
                 // For some reason repo is generally None, but we know it, so...
                 let repo_name = module.clone();
 
@@ -103,10 +114,11 @@ pub async fn get_prs(
                     number,
                     url,
                     author,
-                    state,
+                    state: pr_state,
                     updated_at,
                     repo_name,
                     title,
+                    is_closed,
                 })
             },
         )

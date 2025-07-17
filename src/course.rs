@@ -836,7 +836,9 @@ fn match_pr_to_assignment(
         submissions[sprint_index].submissions[assignment_index] =
             SubmissionState::Some(Submission::PullRequest { pull_request: pr });
     } else {
-        unknown_prs.push(pr);
+        if !pr.is_closed {
+            unknown_prs.push(pr);
+        }
     }
 }
 
