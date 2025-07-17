@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
+use askama::Template;
 use axum::http::{StatusCode, Uri};
-use axum::response::{IntoResponse, Redirect, Response};
+use axum::response::{Html, IntoResponse, Response};
 use moka::future::Cache;
 use tracing::error;
 use uuid::Uuid;
@@ -38,7 +39,7 @@ impl ServerState {
 pub enum Error {
     UserFacing(String),
     Fatal(anyhow::Error),
-    Redirect(Redirect),
+    Redirect(Uri),
 }
 
 impl Error {
@@ -74,7 +75,15 @@ impl IntoResponse for Error {
                 )
                     .into_response()
             }
-            Error::Redirect(redirect) => redirect.into_response(),
+            Error::Redirect(redirect_uri) => {
+                let rendered = crate::frontend::Redirect { redirect_uri }
+                    .render()
+                    .map_err(|err| Error::Fatal(err.into()).context("Failed to render Redirect"));
+                match rendered {
+                    Ok(str) => Html(str).into_response(),
+                    Err(err) => err.into_response(),
+                }
+            }
         }
     }
 }

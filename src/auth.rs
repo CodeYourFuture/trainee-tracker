@@ -49,14 +49,16 @@ pub async fn handle_github_oauth_callback(
 pub(crate) async fn github_auth_redirect_url(
     server_state: &ServerState,
     original_uri: Uri,
-) -> String {
+) -> Result<Uri, Error> {
     let uuid = Uuid::new_v4();
     let redirect_url = format!("https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}/api/oauth-callbacks/github&scope=read:user&scope=read:org&state={}", server_state.config.github_client_id, server_state.config.public_base_url, uuid);
     server_state
         .auth_state_cache
         .insert(uuid, original_uri)
         .await;
-    redirect_url
+    Ok(redirect_url
+        .parse()
+        .context("Statically known correct GitHub auth Uri couldn't be constructed")?)
 }
 
 async fn exchange_github_oauth_code_for_access_token(
@@ -112,11 +114,7 @@ pub async fn handle_google_oauth_callback(
 
     let redirect_uri = server_state.auth_state_cache.remove(&params.state).await;
     if let Some(redirect_uri) = redirect_uri {
-        Ok(Html(
-            crate::frontend::Redirect { redirect_uri }
-                .render()
-                .context("Failed to render")?,
-        ))
+        Err(Error::Redirect(redirect_uri))
     } else {
         Err(Error::Fatal(anyhow!("Unrecognised state")))
     }

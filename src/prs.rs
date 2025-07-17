@@ -8,7 +8,6 @@ use octocrab::models::{Author, IssueState, Label};
 use octocrab::params::State;
 use octocrab::Octocrab;
 use serde::Serialize;
-use tracing::info;
 
 use crate::newtypes::GithubLogin;
 use crate::Error;

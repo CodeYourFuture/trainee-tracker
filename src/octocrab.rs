@@ -1,7 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use axum::response::Redirect;
 use http::{header::USER_AGENT, HeaderValue, Uri};
 use hyper_rustls::HttpsConnectorBuilder;
 use octocrab::{
@@ -33,9 +32,9 @@ pub(crate) async fn octocrab(
     if let Some(token) = maybe_token {
         octocrab_for_token(token)
     } else {
-        Err(Error::Redirect(Redirect::to(
-            &github_auth_redirect_url(server_state, original_uri).await,
-        )))
+        Err(Error::Redirect(
+            github_auth_redirect_url(server_state, original_uri).await?,
+        ))
     }
 }
 
