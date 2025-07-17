@@ -15,6 +15,15 @@ pub(crate) fn cell_string(cell: &CellData) -> Result<String, anyhow::Error> {
     }
 }
 
+pub(crate) fn cell_bool(cell: &CellData) -> Result<bool, anyhow::Error> {
+    let value = cell.effective_value.clone();
+    if let Some(value) = value {
+        Ok(value.bool_value)
+    } else {
+        Ok(false)
+    }
+}
+
 pub(crate) async fn sheets_client(
     session: &Session,
     server_state: ServerState,

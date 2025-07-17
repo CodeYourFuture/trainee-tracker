@@ -34,7 +34,7 @@
             {% for reviewer in reviewers %}
                 {% let days_since_last_review = (now - reviewer.last_review).num_days() %}
                 <div class="reviewer-card {% if days_since_last_review > 28 %}inactive{% else if days_since_last_review < 14 && reviewer.prs.len() > 10 %}super-active{% endif %}">
-                    <h3><a class="username" href="https://github.com/{{reviewer.login}}">{{ reviewer.login }}</a></h3>
+                    <h3><a class="username" href="https://github.com/{{reviewer.login}}">{{ reviewer.login }}</a>{% include "reviewer-staff-summary.html" %}</h3>
                     <div>
                         <details>
                             <summary><span class="total-reviewed-prs">{{ reviewer.prs.len() }}</span> reviewed PRs</summary>

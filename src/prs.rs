@@ -195,11 +195,28 @@ pub(crate) async fn fill_in_reviewers(
 }
 
 #[derive(PartialEq, Eq, Serialize)]
+pub(crate) enum CheckStatus {
+    CheckedAndOk,
+    CheckedAndCheckAgain,
+    Unchecked,
+}
+
+#[derive(PartialEq, Eq, Serialize)]
+pub(crate) struct ReviewerStaffOnlyDetails {
+    pub(crate) name: String,
+    pub(crate) attended_training: bool,
+    pub(crate) checked: CheckStatus,
+    pub(crate) quality: String,
+    pub(crate) notes: String,
+}
+
+#[derive(PartialEq, Eq, Serialize)]
 pub(crate) struct ReviewerInfo {
     pub last_review: chrono::DateTime<chrono::Utc>,
     pub prs: Vec<ReviewedPr>,
     pub login: GithubLogin,
     pub reviews_days_in_last_28_days: u8,
+    pub staff_only_details: Option<ReviewerStaffOnlyDetails>,
 }
 
 impl PartialOrd for ReviewerInfo {
@@ -274,6 +291,7 @@ pub(crate) async fn get_reviewers(
                             prs: Vec::new(),
                             login: review.author.clone(),
                             reviews_days_in_last_28_days: 0,
+                            staff_only_details: None,
                         });
                 if review.created_at > reviewer_info.last_review {
                     reviewer_info.last_review = review.created_at;

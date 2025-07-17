@@ -1,12 +1,13 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use askama::Template;
 use axum::{
-    extract::{OriginalUri, Path, State},
+    extract::{OriginalUri, Path, Query, State},
     response::Html,
 };
 use futures::future::join_all;
 use http::Uri;
+use serde::Deserialize;
 use tower_sessions::Session;
 
 use crate::{
@@ -17,6 +18,7 @@ use crate::{
     },
     octocrab::octocrab,
     prs::{PrState, ReviewerInfo},
+    reviewer_staff_info::get_reviewer_staff_info,
     sheets::sheets_client,
     Error, ServerState,
 };
@@ -145,19 +147,44 @@ impl TraineeBatchTemplate {
     }
 }
 
+#[derive(Deserialize)]
+pub struct ReviewerParams {
+    staff: bool,
+}
+
 pub async fn get_reviewers(
     session: Session,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
     Path(course): Path<String>,
+    Query(reviewer_params): Query<ReviewerParams>,
 ) -> Result<Html<String>, Error> {
+    let mut staff_details = if reviewer_params.staff {
+        let sheets_client =
+            sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
+        get_reviewer_staff_info(
+            sheets_client,
+            &server_state.config.reviewer_staff_info_sheet_id,
+        )
+        .await?
+    } else {
+        BTreeMap::new()
+    };
+
     let octocrab = octocrab(&session, &server_state, original_uri).await?;
     let github_org = server_state.config.github_org.clone();
     let module_names = server_state
         .config
         .get_course_module_names(&course)
         .ok_or_else(|| Error::Fatal(anyhow::anyhow!("Course not found: {course}")))?;
-    let reviewers = crate::prs::get_reviewers(octocrab, github_org, &module_names).await?;
+    let reviewers = crate::prs::get_reviewers(octocrab, github_org, &module_names)
+        .await?
+        .into_iter()
+        .map(|mut reviewer| {
+            reviewer.staff_only_details = staff_details.remove(&reviewer.login);
+            reviewer
+        })
+        .collect();
 
     let now = chrono::Utc::now();
 

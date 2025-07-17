@@ -34,6 +34,8 @@ pub struct Config {
 
     pub github_email_mapping_sheet_id: String,
 
+    pub reviewer_staff_info_sheet_id: String,
+
     // Legacy hack until all trainees are in the sheet.
     pub extra_trainee_github_mappings: BTreeMap<GithubLogin, Trainee>,
 }

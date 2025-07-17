@@ -8,6 +8,7 @@
   "google_sheets_client_id": "403459539948-q1psg497mlfk9u6cgf0eea5qum4gp92n.apps.googleusercontent.com",
   "google_sheets_client_secret": "$CYF_TRAINEE_TRACKER_GOOGLE_SHEETS_CLIENT_SECRET",
   "github_email_mapping_sheet_id": "1ahDEnO8odD9oLtO_EBcvcmEaF0qsX-I4iLCIY0XLjt0",
+  "reviewer_staff_info_sheet_id": "1CKDrXtx5lkgfZ8E2mjvsDup2K8UyBsq99CIV0qOxrP0",
 
   "courses": {
     "itp": {

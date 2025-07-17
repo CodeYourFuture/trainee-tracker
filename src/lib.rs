@@ -18,6 +18,7 @@ pub mod newtypes;
 pub mod octocrab;
 pub mod prs;
 pub mod register;
+pub mod reviewer_staff_info;
 pub mod sheets;
 
 #[derive(Clone)]
