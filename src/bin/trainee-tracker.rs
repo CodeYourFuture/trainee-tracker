@@ -88,6 +88,10 @@ async fn main() {
             "/groups/google",
             get(trainee_tracker::frontend::list_google_groups),
         )
+        .route(
+            "/groups/google.csv",
+            get(trainee_tracker::frontend::list_google_groups_csv),
+        )
         .layer(session_layer)
         .with_state(server_state);
 

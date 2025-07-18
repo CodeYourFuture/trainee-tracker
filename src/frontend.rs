@@ -1,21 +1,13 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    str::FromStr,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Context;
 use askama::Template;
 use axum::{
     extract::{OriginalUri, Path, Query, State},
-    response::Html,
+    response::{Html, IntoResponse, Response},
 };
-use email_address::EmailAddress;
 use futures::future::join_all;
-use gsuite_api::{
-    types::{Group, Member},
-    Response,
-};
-use http::Uri;
+use http::{header::CONTENT_TYPE, StatusCode, Uri};
 use serde::Deserialize;
 use tower_sessions::Session;
 
@@ -25,7 +17,7 @@ use crate::{
     course::{
         fetch_batch_metadata, get_batch, Attendance, Batch, BatchMetadata, Course, Submission,
     },
-    google_groups::{groups_client, GoogleGroup},
+    google_groups::{get_groups, groups_client, GoogleGroup},
     octocrab::octocrab,
     prs::{MaybeReviewerStaffOnlyDetails, PrState, ReviewerInfo},
     reviewer_staff_info::get_reviewer_staff_info,
@@ -248,68 +240,85 @@ pub(crate) struct Redirect {
 #[derive(Template)]
 #[template(path = "google-groups.html")]
 struct GoogleGroups {
-    pub groups: Vec<GoogleGroup>,
+    pub groups: BTreeSet<GoogleGroup>,
+}
+
+#[derive(Deserialize)]
+pub struct GroupListParams {
+    #[serde(default)]
+    expand: bool,
 }
 
 pub async fn list_google_groups(
     session: Session,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
+    Query(params): Query<GroupListParams>,
 ) -> Result<Html<String>, Error> {
     let client = groups_client(&session, server_state, original_uri).await?;
-    let groups_response = client
-        .groups()
-        .list_all(
-            "my_customer",
-            "codeyourfuture.io",
-            gsuite_api::types::DirectoryGroupsListOrderBy::Email,
-            "",
-            gsuite_api::types::SortOrder::Ascending,
-            "",
-        )
-        .await
-        .context("Failed to list Google groups")?;
-    let groups = error_for_status(groups_response)?;
-    let group_member_futures = groups
-        .iter()
-        .map(|Group { id, .. }| async { client.members().list_all(id, false, "").await })
-        .collect::<Vec<_>>();
-    let group_members = join_all(group_member_futures).await;
-
-    let result = groups
-        .into_iter()
-        .zip(group_members.into_iter())
-        .map(|(group, members)| {
-            let members =
-                error_for_status(members.context("Failed to list Google group members")?)?;
-            Ok(GoogleGroup {
-                email: EmailAddress::from_str(&group.email).with_context(|| {
-                    format!("Failed to parse group email address {}", group.email)
-                })?,
-                members: members
-                    .into_iter()
-                    .map(|Member { email, .. }| {
-                        Ok(EmailAddress::from_str(&email).with_context(|| {
-                            format!(
-                                "Failed to parse group member email address {} (member of {})",
-                                email, group.email
-                            )
-                        })?)
-                    })
-                    .collect::<Result<_, anyhow::Error>>()?,
-            })
-        })
-        .collect::<Result<_, Error>>()?;
-    Ok(Html(GoogleGroups { groups: result }.render().unwrap()))
+    let mut groups = get_groups(&client).await?;
+    if params.expand {
+        groups
+            .expand_recursively()
+            .context("Failed to expand groups recursively")?;
+    }
+    Ok(Html(
+        GoogleGroups {
+            groups: groups.groups,
+        }
+        .render()
+        .unwrap(),
+    ))
 }
 
-fn error_for_status<T: std::fmt::Debug>(response: Response<T>) -> Result<T, Error> {
-    if !response.status.is_success() {
-        Err(Error::Fatal(anyhow::anyhow!(
-            "Got bad response from Google Groups API: {:?}",
-            response
-        )))
-    } else {
-        Ok(response.body)
+pub async fn list_google_groups_csv(
+    session: Session,
+    State(server_state): State<ServerState>,
+    OriginalUri(original_uri): OriginalUri,
+    Query(params): Query<GroupListParams>,
+) -> Result<Csv, Error> {
+    let client = groups_client(&session, server_state, original_uri).await?;
+    let mut groups = get_groups(&client).await?;
+    if params.expand {
+        groups
+            .expand_recursively()
+            .context("Failed to expand groups recursively")?;
+    }
+
+    let member_count = groups
+        .groups
+        .iter()
+        .map(|group| group.members.len())
+        .max()
+        .unwrap_or(0);
+
+    // Manually writing a CSV because the CSV crate doesn't like different numbers of fields per record.
+    let mut out = String::new();
+    out += "group";
+    for i in 0..member_count {
+        out += &format!(",member{}", i + 1);
+    }
+    out += "\n";
+
+    for group in groups.groups {
+        out += group.email.as_str();
+        for member in group.members {
+            out += ",";
+            out += member.as_str();
+        }
+        out += "\n"
+    }
+    Ok(Csv(out))
+}
+
+pub struct Csv(String);
+
+impl IntoResponse for Csv {
+    fn into_response(self) -> axum::response::Response {
+        Response::builder()
+            .header(CONTENT_TYPE, "text/csv")
+            .status(StatusCode::OK)
+            .body(axum::body::Body::from(self.0))
+            .expect("Failed to build response")
     }
 }
