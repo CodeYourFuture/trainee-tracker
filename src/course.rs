@@ -7,7 +7,7 @@ use std::{
 use crate::{
     config::CourseScheduleWithRegisterSheetId,
     github_accounts::{get_trainees, Trainee},
-    newtypes::{Email, GithubLogin, Region},
+    newtypes::{GithubLogin, Region},
     octocrab::all_pages,
     prs::{get_prs, Pr, PrState},
     register::{get_register, Register},
@@ -17,6 +17,7 @@ use crate::{
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
+use email_address::EmailAddress;
 use futures::future::join_all;
 use indexmap::{IndexMap, IndexSet};
 use maplit::btreemap;
@@ -310,7 +311,7 @@ impl Batch {
 pub struct TraineeWithSubmissions {
     pub github_login: GithubLogin,
     pub name: String,
-    pub email: Email,
+    pub email: EmailAddress,
     pub region: Region,
     pub modules: IndexMap<String, ModuleWithSubmissions>,
 }
@@ -598,7 +599,10 @@ pub async fn get_batch(
         let trainee = TraineeWithSubmissions {
             github_login,
             name: trainee_name,
-            email: trainee_email.unwrap_or_else(|| Email("unknown".to_owned())),
+            email: trainee_email.unwrap_or_else(|| {
+                EmailAddress::from_str("unknown@example.com")
+                    .expect("Known good email didn't parse")
+            }),
             region,
             modules,
         };
@@ -611,7 +615,7 @@ pub async fn get_batch(
 fn get_trainee_module_attendance(
     register_info: &Register,
     module_name: &str,
-    trainee_email: Option<Email>,
+    trainee_email: Option<EmailAddress>,
     course: &Course,
     region: &Region,
 ) -> Result<Vec<SubmissionState>, Error> {

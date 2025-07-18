@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        There are {{ groups.len() }} groups.
+        {% for group in groups %}
+            <h2><a href="{{ group.link() }}">{{ group.email }}</a> ({{ group.members.len() }})</h2>
+            <ul>
+                {% for member in group.members %}
+                    <li>{{ member }}</li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+    </body>
+</html>

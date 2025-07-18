@@ -19,7 +19,6 @@ pub struct OauthCallbackParams {
 }
 
 pub(crate) const GITHUB_ACCESS_TOKEN_SESSION_KEY: &str = "github_access_token";
-pub(crate) const GOOGLE_DRIVE_ACCESS_TOKEN_SESSION_KEY: &str = "google_drive_access_token";
 
 pub async fn handle_github_oauth_callback(
     State(server_state): State<ServerState>,
@@ -34,7 +33,10 @@ pub async fn handle_github_oauth_callback(
         .insert(GITHUB_ACCESS_TOKEN_SESSION_KEY, access_token)
         .await
         .context("Session load error")?;
-    let redirect_uri = server_state.auth_state_cache.remove(&params.state).await;
+    let redirect_uri = server_state
+        .github_auth_state_cache
+        .remove(&params.state)
+        .await;
     if let Some(redirect_uri) = redirect_uri {
         Ok(Html(
             crate::frontend::Redirect { redirect_uri }
@@ -53,7 +55,7 @@ pub(crate) async fn github_auth_redirect_url(
     let uuid = Uuid::new_v4();
     let redirect_url = format!("https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}/api/oauth-callbacks/github&scope=read:user&scope=read:org&state={}", server_state.config.github_client_id, server_state.config.public_base_url, uuid);
     server_state
-        .auth_state_cache
+        .github_auth_state_cache
         .insert(uuid, original_uri)
         .await;
     Ok(redirect_url
@@ -88,13 +90,23 @@ pub async fn handle_google_oauth_callback(
     session: Session,
     params: Query<OauthCallbackParams>,
 ) -> Result<Html<String>, Error> {
+    let auth_state = if let Some(auth_state) = server_state
+        .google_auth_state_cache
+        .remove(&params.state)
+        .await
+    {
+        auth_state
+    } else {
+        return Err(Error::Fatal(anyhow!("Unrecognised state")));
+    };
+
     let redirect_uri = format!(
         "{}/api/oauth-callbacks/google-drive",
         server_state.config.public_base_url
     );
     let mut client = Client::new(
-        server_state.config.google_sheets_client_id.clone(),
-        (*server_state.config.google_sheets_client_secret).clone(),
+        server_state.config.google_apis_client_id.clone(),
+        (*server_state.config.google_apis_client_secret).clone(),
         String::from(redirect_uri),
         String::new(),
         String::new(),
@@ -106,16 +118,11 @@ pub async fn handle_google_oauth_callback(
         .context("Failed to get access token")?;
     session
         .insert(
-            GOOGLE_DRIVE_ACCESS_TOKEN_SESSION_KEY,
+            auth_state.google_scope.token_session_key(),
             &access_token.access_token,
         )
         .await
         .context("Session insert error")?;
 
-    let redirect_uri = server_state.auth_state_cache.remove(&params.state).await;
-    if let Some(redirect_uri) = redirect_uri {
-        Err(Error::Redirect(redirect_uri))
-    } else {
-        Err(Error::Fatal(anyhow!("Unrecognised state")))
-    }
+    Err(Error::Redirect(auth_state.original_uri))
 }

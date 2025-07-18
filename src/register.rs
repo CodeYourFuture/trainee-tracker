@@ -1,11 +1,13 @@
+use std::str::FromStr;
+
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, Utc};
+use email_address::EmailAddress;
 use indexmap::IndexMap;
 use sheets::types::{CellData, GridData};
 use tracing::warn;
 
 use crate::{
-    newtypes::Email,
     sheets::{cell_string, SheetsClient},
     Error,
 };
@@ -19,13 +21,13 @@ pub struct Register {
 #[derive(Debug)]
 pub struct ModuleAttendance {
     pub register_url: String,
-    pub attendance: Vec<IndexMap<Email, Attendance>>,
+    pub attendance: Vec<IndexMap<EmailAddress, Attendance>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Attendance {
     pub name: String,
-    pub email: Email,
+    pub email: EmailAddress,
     pub timestamp: DateTime<Utc>,
     pub region: String,
     pub register_url: String,
@@ -105,7 +107,7 @@ fn read_module(
     register_url: String,
     start_date: NaiveDate,
     end_date: NaiveDate,
-) -> Result<Vec<IndexMap<Email, Attendance>>, anyhow::Error> {
+) -> Result<Vec<IndexMap<EmailAddress, Attendance>>, anyhow::Error> {
     let mut sprints = Vec::new();
     'sheet: for data in sheet_data {
         if data.start_column != 0 || data.start_row != 0 {
@@ -197,7 +199,7 @@ fn read_row(
         &cell_string(&cells[5]).context("Couldn't get sprint value from column 5")?,
     )?;
     let name = cell_string(&cells[0]).context("Failed to read name")?;
-    let email = Email(cell_string(&cells[1]).context("Failed to read email")?);
+    let email = EmailAddress::from_str(&cell_string(&cells[1]).context("Failed to read email")?)?;
     let timestamp =
         DateTime::parse_from_rfc3339(&cell_string(&cells[2]).context("Failed to read timestamp")?)
             .context("Failed to parse timestamp")?

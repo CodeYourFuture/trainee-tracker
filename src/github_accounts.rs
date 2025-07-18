@@ -1,11 +1,12 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, str::FromStr};
 
 use anyhow::Context;
+use email_address::EmailAddress;
 use serde::{Deserialize, Serialize};
 use sheets::types::Sheet;
 
 use crate::{
-    newtypes::{Email, GithubLogin, Region},
+    newtypes::{GithubLogin, Region},
     sheets::{cell_string, SheetsClient},
     Error,
 };
@@ -60,7 +61,7 @@ pub struct Trainee {
     pub name: String,
     pub region: Region,
     pub github_login: GithubLogin,
-    pub email: Email,
+    pub email: EmailAddress,
 }
 
 fn trainees_from_sheet(
@@ -85,6 +86,8 @@ fn trainees_from_sheet(
                 cell_string(&cells[3]).context("Failed to read trainee github login")?,
             );
 
+            let email = cell_string(&cells[4]).context("Failed to read trainee email")?;
+
             trainees.insert(
                 github_login.clone(),
                 Trainee {
@@ -93,7 +96,8 @@ fn trainees_from_sheet(
                         cell_string(&cells[2]).context("Failed to read trainee region")?,
                     ),
                     github_login,
-                    email: Email(cell_string(&cells[4]).context("Failed to read trainee email")?),
+                    email: EmailAddress::from_str(&email)
+                        .with_context(|| format!("Failed to parse trainee email {}", email))?,
                 },
             );
         }

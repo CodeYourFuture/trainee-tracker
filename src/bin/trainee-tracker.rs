@@ -84,6 +84,10 @@ async fn main() {
             "/courses/{course}/reviewers",
             get(trainee_tracker::frontend::get_reviewers),
         )
+        .route(
+            "/groups/google",
+            get(trainee_tracker::frontend::list_google_groups),
+        )
         .layer(session_layer)
         .with_state(server_state);
 

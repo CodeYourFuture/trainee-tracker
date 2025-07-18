@@ -2,9 +2,11 @@ use anyhow::Context;
 use http::Uri;
 use sheets::{spreadsheets::Spreadsheets, types::CellData};
 use tower_sessions::Session;
-use uuid::Uuid;
 
-use crate::{auth::GOOGLE_DRIVE_ACCESS_TOKEN_SESSION_KEY, Error, ServerState};
+use crate::{
+    google_auth::{make_redirect_uri, redirect_endpoint, GoogleScope},
+    Error, ServerState,
+};
 
 pub(crate) fn cell_string(cell: &CellData) -> Result<String, anyhow::Error> {
     let value = cell.effective_value.clone();
@@ -30,7 +32,7 @@ pub(crate) async fn sheets_client(
     original_uri: Uri,
 ) -> Result<SheetsClient, Error> {
     let maybe_token: Option<String> = session
-        .get(GOOGLE_DRIVE_ACCESS_TOKEN_SESSION_KEY)
+        .get(GoogleScope::Sheets.token_session_key())
         .await
         .context("Session load error")?;
 
@@ -38,8 +40,8 @@ pub(crate) async fn sheets_client(
 
     if let Some(token) = maybe_token {
         let client = ::sheets::Client::new(
-            server_state.config.google_sheets_client_id.clone(),
-            server_state.config.google_sheets_client_secret.to_string(),
+            server_state.config.google_apis_client_id.clone(),
+            server_state.config.google_apis_client_secret.to_string(),
             &redirect_endpoint,
             token,
             "",
@@ -51,33 +53,15 @@ pub(crate) async fn sheets_client(
         })
     } else {
         Err(Error::Redirect(
-            make_redirect_uri(&server_state, original_uri, &redirect_endpoint).await?,
+            make_redirect_uri(
+                &server_state,
+                original_uri,
+                &redirect_endpoint,
+                GoogleScope::Sheets,
+            )
+            .await?,
         ))
     }
-}
-
-fn redirect_endpoint(server_state: &ServerState) -> String {
-    format!(
-        "{}/api/oauth-callbacks/google-drive",
-        server_state.config.public_base_url
-    )
-}
-
-async fn make_redirect_uri(
-    server_state: &ServerState,
-    original_uri: Uri,
-    redirect_uri: &str,
-) -> Result<Uri, Error> {
-    let state = Uuid::new_v4();
-    server_state
-        .auth_state_cache
-        .insert(state, original_uri)
-        .await;
-    let user_consent_url = format!(
-            "{}?client_id={}&access_type=offline&response_type=code&redirect_uri={}&state={}&scope=https://www.googleapis.com/auth/spreadsheets.readonly",
-            "https://accounts.google.com/o/oauth2/v2/auth", server_state.config.google_sheets_client_id, redirect_uri, state
-        ).parse().context("Statically known correct Sheets auth Uri couldn't be constructed")?;
-    Ok(user_consent_url)
 }
 
 #[derive(Clone)]
@@ -107,6 +91,7 @@ impl SheetsClient {
                         &self.server_state,
                         self.original_uri,
                         &&redirect_endpoint(&self.server_state),
+                        GoogleScope::Sheets,
                     )
                     .await?,
                 ))

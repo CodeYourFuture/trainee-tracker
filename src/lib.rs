@@ -10,10 +10,14 @@ use uuid::Uuid;
 pub mod auth;
 pub mod config;
 pub use config::Config;
+
+use crate::google_auth::GoogleScope;
 pub mod course;
 pub mod endpoints;
 pub mod frontend;
 pub mod github_accounts;
+pub mod google_auth;
+pub mod google_groups;
 pub mod newtypes;
 pub mod octocrab;
 pub mod prs;
@@ -23,17 +27,25 @@ pub mod sheets;
 
 #[derive(Clone)]
 pub struct ServerState {
-    pub auth_state_cache: Cache<Uuid, Uri>,
+    pub github_auth_state_cache: Cache<Uuid, Uri>,
+    pub google_auth_state_cache: Cache<Uuid, GoogleAuthState>,
     pub config: Config,
 }
 
 impl ServerState {
     pub fn new(config: Config) -> ServerState {
         ServerState {
-            auth_state_cache: Cache::new(1_000_000),
+            github_auth_state_cache: Cache::new(1_000_000),
+            google_auth_state_cache: Cache::new(1_000_000),
             config,
         }
     }
+}
+
+#[derive(Clone)]
+pub struct GoogleAuthState {
+    pub original_uri: Uri,
+    pub google_scope: GoogleScope,
 }
 
 #[derive(Debug)]

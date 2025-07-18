@@ -29,8 +29,8 @@ pub struct Config {
     /// e.g. for itp, we'd expect itp-trainees/2025-05 and itp-mentors to exist.
     pub courses: IndexMap<String, CourseInfo>,
 
-    pub google_sheets_client_id: String,
-    pub google_sheets_client_secret: EnvField<String>,
+    pub google_apis_client_id: String,
+    pub google_apis_client_secret: EnvField<String>,
 
     pub github_email_mapping_sheet_id: String,
 

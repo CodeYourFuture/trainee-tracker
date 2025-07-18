@@ -485,6 +485,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
+name = "email_address"
+version = "0.2.9"
+source = "git+https://github.com/illicitonion/rust-email_address.git?rev=12cd9762a166b79a227beaa90b2f60a768d7c55c#12cd9762a166b79a227beaa90b2f60a768d7c55c"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -715,6 +723,41 @@ name = "google-drive"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc1b3a31edad05993052d107d4e640df7e0b4940a8f9ecb2e4560850fe3d14e7"
+dependencies = [
+ "async-recursion",
+ "async-trait",
+ "base64 0.21.7",
+ "bytes",
+ "chrono",
+ "http 0.2.12",
+ "jsonwebtoken 8.3.0",
+ "log",
+ "mime",
+ "parse_link_header",
+ "pem 1.1.1",
+ "percent-encoding",
+ "reqwest 0.11.27",
+ "reqwest-conditional-middleware",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "reqwest-tracing",
+ "ring 0.16.20",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror 1.0.69",
+ "tokio",
+ "url",
+ "uuid",
+ "yup-oauth2",
+]
+
+[[package]]
+name = "gsuite-api"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c79a061d9fc82c802ce7322fc229e515676024b983738f1bacb080d6692f344b"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -3136,8 +3179,10 @@ dependencies = [
  "case_insensitive_string",
  "chrono",
  "chrono-tz",
+ "email_address",
  "futures",
  "google-drive",
+ "gsuite-api",
  "http 1.3.1",
  "hyper-rustls 0.27.7",
  "hyper-util",
