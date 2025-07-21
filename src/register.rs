@@ -35,6 +35,9 @@ pub struct Attendance {
 
 impl Attendance {
     pub fn to_attendance_enum(&self, start_time: DateTime<Utc>) -> crate::course::Attendance {
+        if self.timestamp.date_naive() != start_time.date_naive() {
+            return crate::course::Attendance::WrongDay { register_url: self.register_url.clone() };
+        }
         let late_by = self.timestamp.signed_duration_since(start_time);
         if late_by.num_minutes() > 10 {
             crate::course::Attendance::Late {

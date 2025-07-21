@@ -334,6 +334,9 @@ impl TraineeWithSubmissions {
                                 Attendance::Late { .. } => {
                                     numerator += 8;
                                 }
+                                Attendance::WrongDay { .. } => {
+                                    numerator += 3;
+                                }
                                 Attendance::Absent { .. } => {}
                             }
                         }
@@ -382,7 +385,7 @@ impl TraineeWithSubmissions {
                             Attendance::OnTime { .. } | Attendance::Late { .. } => {
                                 numerator += 1;
                             }
-                            Attendance::Absent { .. } => {}
+                            Attendance::Absent { .. } | Attendance::WrongDay { .. } => {}
                         }
                     }
                 }
@@ -435,6 +438,7 @@ impl Submission {
             Self::Attendance(Attendance::Absent { .. }) => String::from("Absent"),
             Self::Attendance(Attendance::OnTime { .. }) => String::from("On time"),
             Self::Attendance(Attendance::Late { .. }) => String::from("Late"),
+            Self::Attendance(Attendance::WrongDay { .. }) => String::from("Wrong day"),
             Self::PullRequest { pull_request } => format!("#{}", pull_request.number),
         }
     }
@@ -452,6 +456,7 @@ pub enum Attendance {
     Absent { register_url: String },
     OnTime { register_url: String },
     Late { register_url: String },
+    WrongDay { register_url: String },
 }
 
 impl Attendance {
@@ -460,6 +465,7 @@ impl Attendance {
             Attendance::Absent { register_url } => &register_url,
             Attendance::OnTime { register_url } => &register_url,
             Attendance::Late { register_url } => &register_url,
+            Attendance::WrongDay { register_url } => &register_url,
         }
     }
 }
@@ -649,7 +655,6 @@ fn get_trainee_module_attendance(
                     .collect::<Vec<chrono::NaiveDate>>();
                 let attendance = match dates.as_slice() {
                     [date] => {
-                        // TODO: Handle Cape Town
                         let start_time = DateTime::<Tz>::from_naive_utc_and_offset(
                             NaiveDateTime::new(
                                 date.clone(),
