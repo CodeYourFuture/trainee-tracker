@@ -140,7 +140,9 @@ impl TraineeBatchTemplate {
             Submission::Attendance(Attendance::Absent { .. }) => String::from("attendance-absent"),
             Submission::Attendance(Attendance::OnTime { .. }) => String::from("attendance-present"),
             Submission::Attendance(Attendance::Late { .. }) => String::from("attendance-late"),
-            Submission::Attendance(Attendance::WrongDay { .. }) => String::from("attendance-wrong-day"),
+            Submission::Attendance(Attendance::WrongDay { .. }) => {
+                String::from("attendance-wrong-day")
+            }
             Submission::PullRequest { pull_request } => match pull_request.state {
                 PrState::NeedsReview => "pr-needs-review".to_owned(),
                 PrState::Reviewed => "pr-reviewed".to_owned(),
