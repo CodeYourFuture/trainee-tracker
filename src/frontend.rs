@@ -22,6 +22,7 @@ use crate::{
     prs::{MaybeReviewerStaffOnlyDetails, PrState, ReviewerInfo},
     reviewer_staff_info::get_reviewer_staff_info,
     sheets::sheets_client,
+    slack::list_groups_with_members,
     Error, ServerState,
 };
 
@@ -322,4 +323,45 @@ impl IntoResponse for Csv {
             .body(axum::body::Body::from(self.0))
             .expect("Failed to build response")
     }
+}
+
+pub async fn list_slack_groups_csv(
+    session: Session,
+    State(server_state): State<ServerState>,
+    OriginalUri(original_uri): OriginalUri,
+) -> Result<Csv, Error> {
+    let client = crate::slack::slack_client(&session, server_state, original_uri).await?;
+    let groups = list_groups_with_members(client).await?;
+
+    let member_count = groups
+        .iter()
+        .map(|group| group.members.len())
+        .max()
+        .unwrap_or(0);
+
+    let mut out = String::new();
+    out += "id,handle,name";
+    for i in 0..member_count {
+        out += &format!(",member{}email,member{}name", i + 1, i + 1);
+    }
+    out += "\n";
+
+    for group in groups {
+        out += group.id.as_str();
+        out += ",";
+        out += &group.handle;
+        out += ",";
+        out += &group.name;
+        for member in group.members {
+            out += ",";
+            out += &member
+                .profile
+                .email
+                .map_or_else(|| "unknown".to_owned(), |email| email.to_string());
+            out += ",";
+            out += &member.real_name;
+        }
+        out += "\n"
+    }
+    Ok(Csv(out))
 }

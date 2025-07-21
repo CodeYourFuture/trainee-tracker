@@ -10,6 +10,9 @@
   "github_email_mapping_sheet_id": "1ahDEnO8odD9oLtO_EBcvcmEaF0qsX-I4iLCIY0XLjt0",
   "reviewer_staff_info_sheet_id": "1CKDrXtx5lkgfZ8E2mjvsDup2K8UyBsq99CIV0qOxrP0",
 
+  "slack_client_id": "85239491699.9205264014663",
+  "slack_client_secret": "$CYF_TRAINEE_TRACKER_SLACK_CLIENT_SECRET",
+
   "courses": {
     "itp": {
       "register_sheet_id": "1YHKPCCN55PJD-o1jg4wbVKI3kbhB-ULiwB5hhG17DcA",

@@ -32,6 +32,9 @@ pub struct Config {
     pub google_apis_client_id: String,
     pub google_apis_client_secret: EnvField<String>,
 
+    pub slack_client_id: String,
+    pub slack_client_secret: EnvField<String>,
+
     pub github_email_mapping_sheet_id: String,
 
     pub reviewer_staff_info_sheet_id: String,

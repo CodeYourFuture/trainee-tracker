@@ -10,7 +10,10 @@ use sheets::Client;
 use tower_sessions::Session;
 use uuid::Uuid;
 
-use crate::{Config, Error, ServerState};
+use crate::{
+    slack::{make_slack_redirect_uri, SLACK_ACCESS_TOKEN_SESSION_KEY},
+    Config, Error, ServerState,
+};
 
 #[derive(Deserialize)]
 pub struct OauthCallbackParams {
@@ -32,7 +35,7 @@ pub async fn handle_github_oauth_callback(
     session
         .insert(GITHUB_ACCESS_TOKEN_SESSION_KEY, access_token)
         .await
-        .context("Session load error")?;
+        .context("Session insert error")?;
     let redirect_uri = server_state
         .github_auth_state_cache
         .remove(&params.state)
@@ -125,4 +128,47 @@ pub async fn handle_google_oauth_callback(
         .context("Session insert error")?;
 
     Err(Error::Redirect(auth_state.original_uri))
+}
+
+pub async fn handle_slack_oauth_callback(
+    State(server_state): State<ServerState>,
+    session: Session,
+    Query(params): Query<OauthCallbackParams>,
+) -> Result<Html<String>, Error> {
+    let client = slack_with_types::client::Client::new_without_auth(
+        reqwest::Client::new(),
+        slack_with_types::client::RateLimiter::new(),
+    );
+    let response: slack_with_types::oauth::OauthExchangeResponse = client
+        .post(
+            "oauth.v2.access",
+            &slack_with_types::oauth::OauthExchangeRequest {
+                client_id: server_state.config.slack_client_id,
+                client_secret: server_state.config.slack_client_secret.to_string(),
+                code: params.code,
+                redirect_uri: Some(make_slack_redirect_uri(
+                    &server_state.config.public_base_url,
+                )),
+            },
+        )
+        .await
+        .context("Failed to exchange oauth token")?;
+
+    session
+        .insert(SLACK_ACCESS_TOKEN_SESSION_KEY, response.access_token)
+        .await
+        .context("Session insert error")?;
+    let redirect_uri = server_state
+        .slack_auth_state_cache
+        .remove(&params.state)
+        .await;
+    if let Some(redirect_uri) = redirect_uri {
+        Ok(Html(
+            crate::frontend::Redirect { redirect_uri }
+                .render()
+                .context("Failed to render")?,
+        ))
+    } else {
+        Err(Error::Fatal(anyhow!("Unrecognised state")))
+    }
 }

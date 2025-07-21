@@ -74,6 +74,10 @@ async fn main() {
             "/api/oauth-callbacks/google-drive",
             get(trainee_tracker::auth::handle_google_oauth_callback),
         )
+        .route(
+            "/api/oauth-callbacks/slack",
+            get(trainee_tracker::auth::handle_slack_oauth_callback),
+        )
         .route("/", get(trainee_tracker::frontend::index))
         .route("/courses", get(trainee_tracker::frontend::list_courses))
         .route(
@@ -91,6 +95,10 @@ async fn main() {
         .route(
             "/groups/google.csv",
             get(trainee_tracker::frontend::list_google_groups_csv),
+        )
+        .route(
+            "/groups/slack.csv",
+            get(trainee_tracker::frontend::list_slack_groups_csv),
         )
         .layer(session_layer)
         .with_state(server_state);

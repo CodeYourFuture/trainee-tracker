@@ -1,9 +1,11 @@
 use std::fmt::Display;
+use std::time::Duration;
 
 use askama::Template;
 use axum::http::{StatusCode, Uri};
 use axum::response::{Html, IntoResponse, Response};
 use moka::future::Cache;
+use slack_with_types::client::RateLimiter;
 use tracing::error;
 use uuid::Uuid;
 
@@ -24,11 +26,14 @@ pub mod prs;
 pub mod register;
 pub mod reviewer_staff_info;
 pub mod sheets;
+pub mod slack;
 
 #[derive(Clone)]
 pub struct ServerState {
     pub github_auth_state_cache: Cache<Uuid, Uri>,
     pub google_auth_state_cache: Cache<Uuid, GoogleAuthState>,
+    pub slack_auth_state_cache: Cache<Uuid, Uri>,
+    pub slack_rate_limiters: Cache<String, RateLimiter>,
     pub config: Config,
 }
 
@@ -37,6 +42,10 @@ impl ServerState {
         ServerState {
             github_auth_state_cache: Cache::new(1_000_000),
             google_auth_state_cache: Cache::new(1_000_000),
+            slack_auth_state_cache: Cache::new(1_000_000),
+            slack_rate_limiters: Cache::builder()
+                .time_to_idle(Duration::from_secs(300))
+                .build(),
             config,
         }
     }
