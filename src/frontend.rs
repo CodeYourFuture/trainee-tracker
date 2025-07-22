@@ -16,6 +16,7 @@ use crate::{
     config::CourseScheduleWithRegisterSheetId,
     course::{
         fetch_batch_metadata, get_batch, Attendance, Batch, BatchMetadata, Course, Submission,
+        TraineeStatus,
     },
     google_groups::{get_groups, groups_client, GoogleGroup},
     octocrab::octocrab,
@@ -135,7 +136,7 @@ struct TraineeBatchTemplate {
 }
 
 impl TraineeBatchTemplate {
-    fn css_classes(&self, submission: &Submission) -> String {
+    fn css_classes_for_submission(&self, submission: &Submission) -> String {
         match submission {
             Submission::Attendance(Attendance::Absent { .. }) => String::from("attendance-absent"),
             Submission::Attendance(Attendance::OnTime { .. }) => String::from("attendance-present"),
@@ -150,6 +151,32 @@ impl TraineeBatchTemplate {
                 PrState::Unknown => "pr-unknown".to_owned(),
             },
         }
+    }
+
+    fn css_classes_for_trainee_status(&self, trainee_status: &TraineeStatus) -> String {
+        match trainee_status {
+            TraineeStatus::OnTrack => "trainee-on-track",
+            TraineeStatus::Behind => "trainee-behind",
+            TraineeStatus::AtRisk => "trainee-at-risk",
+        }
+        .to_owned()
+    }
+
+    fn on_track_and_total_for_region(&self, region: Option<&str>) -> (usize, usize) {
+        let mut on_track = 0;
+        let mut total = 0;
+        for trainee in &self.batch.trainees {
+            if let Some(region) = region {
+                if trainee.region.as_str() != region {
+                    continue;
+                }
+            }
+            if trainee.status() == TraineeStatus::OnTrack {
+                on_track += 1;
+            }
+            total += 1;
+        }
+        (on_track, total)
     }
 }
 

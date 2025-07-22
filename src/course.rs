@@ -316,7 +316,26 @@ pub struct TraineeWithSubmissions {
     pub modules: IndexMap<String, ModuleWithSubmissions>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum TraineeStatus {
+    OnTrack,
+    Behind,
+    AtRisk,
+}
+
 impl TraineeWithSubmissions {
+    pub fn status(&self) -> TraineeStatus {
+        let progress_score = self.progress_score();
+        // These thresholds are super arbitrary.
+        if progress_score >= 5000 {
+            TraineeStatus::OnTrack
+        } else if progress_score >= 2500 {
+            TraineeStatus::Behind
+        } else {
+            TraineeStatus::AtRisk
+        }
+    }
+
     // This whole calculation is super ad-hoc, we should feel free to tweak this whole process and these parameters however we find useful.
     pub fn progress_score(&self) -> u64 {
         let mut numerator = 0_u64;
