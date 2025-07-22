@@ -132,7 +132,7 @@
                     regionToShow[checkbox.value] = checkbox.checked;
                 }
                 for (const row of Array.from(document.getElementsByTagName("tr")).slice(3)) {
-                    const region = row.getElementsByTagName("td")[1].textContent;
+                    const region = row.getElementsByTagName("td")[0].textContent;
                     row.style.display = regionToShow[region] ? "table-row" : "none";
                 }
             };
