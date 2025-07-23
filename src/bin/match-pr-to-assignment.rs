@@ -63,7 +63,7 @@ async fn main() {
     .with_assignments(&octocrab, org_name.clone())
     .await
     .expect("Failed to get assignments");
-    let module_prs = get_prs(&octocrab, org_name, module_name.clone())
+    let module_prs = get_prs(&octocrab, org_name, module_name.clone(), true)
         .await
         .expect("Failed to get PRs");
     let pr_in_question = module_prs

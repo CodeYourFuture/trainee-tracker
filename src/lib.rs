@@ -65,7 +65,7 @@ pub enum Error {
 }
 
 impl Error {
-    fn context(self, context: &'static str) -> Self {
+    pub fn context(self, context: &'static str) -> Self {
         match self {
             Self::UserFacing(message) => Self::UserFacing(message),
             Self::Fatal(err) => Self::Fatal(err.context(context)),
@@ -73,7 +73,7 @@ impl Error {
         }
     }
 
-    fn with_context<F: FnOnce() -> String>(self, f: F) -> Self {
+    pub fn with_context<F: FnOnce() -> String>(self, f: F) -> Self {
         match self {
             Self::UserFacing(message) => Self::UserFacing(message),
             Self::Fatal(err) => Self::Fatal(err.context(f())),

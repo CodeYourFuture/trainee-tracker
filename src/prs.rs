@@ -68,11 +68,16 @@ pub async fn get_prs(
     octocrab: &Octocrab,
     org_name: String,
     module: String,
+    include_complete_closed: bool,
 ) -> Result<Vec<Pr>, Error> {
     let page = octocrab
         .pulls(org_name, module.clone())
         .list()
-        .state(State::All)
+        .state(if include_complete_closed {
+            State::All
+        } else {
+            State::Open
+        })
         .send()
         .await
         .context("Failed to get PRs")?;
@@ -264,7 +269,7 @@ pub(crate) async fn get_reviewers(
         let octocrab = octocrab.clone();
         let github_org = github_org.clone();
         futures.push(async move {
-            let prs = get_prs(&octocrab, github_org.clone(), module.clone()).await?;
+            let prs = get_prs(&octocrab, github_org.clone(), module.clone(), true).await?;
             fill_in_reviewers(octocrab, github_org, prs).await
         });
     }

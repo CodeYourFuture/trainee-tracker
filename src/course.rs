@@ -564,7 +564,7 @@ pub async fn get_batch(
     let pr_futures = course
         .modules
         .keys()
-        .map(|module| get_prs(octocrab, github_org.clone(), module.clone()))
+        .map(|module| get_prs(octocrab, github_org.clone(), module.clone(), true))
         .collect::<Vec<_>>();
     let prs_by_module = join_all(pr_futures)
         .await
@@ -816,7 +816,7 @@ fn match_pr_to_assignment(
                 continue;
             }
         }
-        let mut pr_title_words = title_word_set(pr.title.trim_end_matches('.'));
+        let mut pr_title_words = title_word_set(&pr.title);
         if let Some(claimed_sprint_index) = claimed_sprint_index {
             let claimed_sprint_number = claimed_sprint_index + 1;
             pr_title_words.insert(format!("sprint{}", claimed_sprint_number));
@@ -827,7 +827,7 @@ fn match_pr_to_assignment(
                 Assignment::ExpectedPullRequest {
                     title: expected_title,
                 } => {
-                    let mut assignment_title_words = title_word_set(expected_title);
+                    let mut assignment_title_words = make_title_more_matchable(expected_title);
                     if let Some(claimed_sprint_index) = claimed_sprint_index {
                         let claimed_sprint_number = claimed_sprint_index + 1;
                         if assignment_title_words.contains("sprint") {
@@ -868,6 +868,20 @@ fn match_pr_to_assignment(
             unknown_prs.push(pr);
         }
     }
+}
+
+fn make_title_more_matchable(title: &str) -> IndexSet<String> {
+    use itertools::Itertools;
+
+    let mut title_set = title_word_set(title.trim_end_matches('.'));
+
+    // Put together adjacent words, like turning "alarm clock" into "alarmclock" to match with common modifications trainees tend to make.
+    let words: Vec<_> = title_set.iter().cloned().collect();
+    // TODO: Replace tuple_windows with slice::array_windows with it stabilises https://github.com/rust-lang/rust/issues/75027
+    for (first, second) in words.iter().tuple_windows::<(_, _)>() {
+        title_set.insert(format!("{first}{second}"));
+    }
+    title_set
 }
 
 fn title_word_set(title: &str) -> IndexSet<String> {
