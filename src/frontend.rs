@@ -12,7 +12,6 @@ use serde::Deserialize;
 use tower_sessions::Session;
 
 use crate::{
-    auth::github_auth_redirect_url,
     config::CourseScheduleWithRegisterSheetId,
     course::{
         fetch_batch_metadata, get_batch, Attendance, Batch, BatchMetadata, Course, Submission,
@@ -248,19 +247,13 @@ struct ReviewersTemplate {
     pub now: chrono::DateTime<chrono::Utc>,
 }
 
-pub async fn index(
-    State(server_state): State<ServerState>,
-    OriginalUri(original_uri): OriginalUri,
-) -> Result<Html<String>, Error> {
-    let login_url = github_auth_redirect_url(&server_state, original_uri).await?;
-    Ok(Html(Index { login_url }.render().unwrap()))
+pub async fn index() -> Html<String> {
+    Html(Index {}.render().unwrap())
 }
 
 #[derive(Template)]
 #[template(path = "index.html")]
-struct Index {
-    pub login_url: Uri,
-}
+struct Index {}
 
 #[derive(Template)]
 #[template(path = "redirect.html")]
