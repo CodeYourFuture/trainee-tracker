@@ -1,0 +1,36 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v[0-9]+\\.[0-9]+\\.[0-9]"
+  workflow_dispatch:
+
+jobs:
+  validate_pr_metadata:
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.88.0-alpine
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install gcc
+        run: apk add gcc g++
+      - name: Build validator
+        run: cargo build --release --bin pr-metadata-validator
+      - name: Create release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+          target_commitish: ${{ github.base_ref }}
+      - name: Upload validator to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_name: pr-metadata-validator-musl-${{ github.ref_name }}
+          asset_path: target/release/pr-metadata-validator
+          asset_content_type: application/octet-stream
