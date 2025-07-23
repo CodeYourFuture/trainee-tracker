@@ -564,7 +564,7 @@ pub async fn get_batch(
     let pr_futures = course
         .modules
         .keys()
-        .map(|module| get_prs(octocrab, github_org.clone(), module.clone()))
+        .map(|module| get_prs(octocrab, github_org.clone(), module.clone(), true))
         .collect::<Vec<_>>();
     let prs_by_module = join_all(pr_futures)
         .await
