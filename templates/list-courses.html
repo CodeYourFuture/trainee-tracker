@@ -8,7 +8,12 @@
             {% for batch in cwbm.batch_metadata %}
             <li><a href="/courses/{{ cwbm.course.name }}/batches/{{ batch.github_team_slug }}">{{ batch.name }}</a></li>
             {% endfor %}
-            <li><a href="/courses/{{ cwbm.course.name }}/reviewers">Reviewers</a></li>
+            <li>
+                <a href="/courses/{{ cwbm.course.name }}/reviewers">Reviewers</a>
+                {% if is_staff %}
+                (<a href="/courses/{{ cwbm.course.name }}/reviewers?staff=true">Staff view</a>)
+                {% endif %}
+            </li>
         </ul>
         {% endfor %}
     </body>
