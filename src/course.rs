@@ -277,6 +277,11 @@ impl Assignment {
     }
 }
 
+pub struct BatchMembers {
+    pub name: String,
+    pub trainees: BTreeMap<GithubLogin, Trainee>,
+}
+
 #[derive(Debug)]
 pub struct Batch {
     pub name: String,
@@ -295,7 +300,9 @@ impl Batch {
     pub fn all_regions(&self) -> Vec<Region> {
         let mut region_counts: HashMap<_, usize> = HashMap::new();
         for trainee in &self.trainees {
-            let count = region_counts.entry(trainee.region.clone()).or_default();
+            let count = region_counts
+                .entry(trainee.trainee.region.clone())
+                .or_default();
             *count = *count + 1;
         }
         let mut region_counts = region_counts.into_iter().collect::<Vec<_>>();
@@ -309,10 +316,7 @@ impl Batch {
 
 #[derive(Debug)]
 pub struct TraineeWithSubmissions {
-    pub github_login: GithubLogin,
-    pub name: String,
-    pub email: EmailAddress,
-    pub region: Region,
+    pub trainee: Trainee,
     pub modules: IndexMap<String, ModuleWithSubmissions>,
 }
 
@@ -516,15 +520,14 @@ pub(crate) async fn fetch_batch_metadata(
         .collect())
 }
 
-pub async fn get_batch(
+pub async fn get_batch_members(
     octocrab: &Octocrab,
     sheets_client: SheetsClient,
     github_email_mapping_sheet_id: &str,
     github_org: String,
     batch_github_slug: String,
-    course: &Course,
     extra_trainees: BTreeMap<GithubLogin, Trainee>,
-) -> Result<Batch, Error> {
+) -> Result<BatchMembers, Error> {
     let trainee_info = get_trainees(
         sheets_client.clone(),
         github_email_mapping_sheet_id,
@@ -532,25 +535,10 @@ pub async fn get_batch(
     )
     .await?;
 
-    let register_info = get_register(
-        sheets_client,
-        course.register_sheet_id.clone(),
-        course.start_date,
-        course.end_date,
-    )
-    .await?;
-
-    let team = octocrab
-        .teams(github_org.clone())
-        .get(batch_github_slug.clone())
-        .await
-        .context("Failed to get team")?;
-    let name = team.name;
-
     let members = all_pages("members", octocrab, async || {
         octocrab
             .teams(github_org.clone())
-            .members(batch_github_slug)
+            .members(batch_github_slug.clone())
             .send()
             .await
     })
@@ -560,6 +548,52 @@ pub async fn get_batch(
         .iter()
         .map(|Author { login, .. }| GithubLogin::from(login.clone()))
         .collect::<BTreeSet<_>>();
+
+    let team = octocrab
+        .teams(github_org.clone())
+        .get(batch_github_slug)
+        .await
+        .context("Failed to get team")?;
+    let name = team.name;
+
+    let trainees = member_logins
+        .into_iter()
+        .filter_map(|login| {
+            trainee_info
+                .get(&login)
+                .map(|trainee| (login, trainee.clone()))
+        })
+        .collect();
+
+    Ok(BatchMembers { name, trainees })
+}
+
+pub async fn get_batch_with_submissions(
+    octocrab: &Octocrab,
+    sheets_client: SheetsClient,
+    github_email_mapping_sheet_id: &str,
+    github_org: String,
+    batch_github_slug: String,
+    course: &Course,
+    extra_trainees: BTreeMap<GithubLogin, Trainee>,
+) -> Result<Batch, Error> {
+    let register_info = get_register(
+        sheets_client.clone(),
+        course.register_sheet_id.clone(),
+        course.start_date,
+        course.end_date,
+    )
+    .await?;
+
+    let batch_members = get_batch_members(
+        octocrab,
+        sheets_client,
+        github_email_mapping_sheet_id,
+        github_org.clone(),
+        batch_github_slug,
+        extra_trainees,
+    )
+    .await?;
 
     let pr_futures = course
         .modules
@@ -571,17 +605,17 @@ pub async fn get_batch(
         .into_iter()
         .collect::<Result<Vec<Vec<Pr>>, Error>>()?;
     let mut member_to_module_to_prs = BTreeMap::new();
-    for member in &member_logins {
+    for github_login in batch_members.trainees.keys() {
         let mut module_to_prs = IndexMap::new();
         for module in course.modules.keys() {
             module_to_prs.insert(module, Vec::new());
         }
-        member_to_module_to_prs.insert(member.clone(), module_to_prs);
+        member_to_module_to_prs.insert(github_login.clone(), module_to_prs);
     }
     for (module_name, prs) in course.modules.keys().zip(prs_by_module) {
         for pr in prs {
             let author = pr.author.clone();
-            if member_logins.contains(&author) {
+            if batch_members.trainees.contains_key(&author) {
                 member_to_module_to_prs
                     .get_mut(&author)
                     // UNWRAP: By construction above.
@@ -593,9 +627,9 @@ pub async fn get_batch(
             }
         }
     }
-    let mut trainees = Vec::with_capacity(member_logins.len());
+    let mut trainees = Vec::with_capacity(batch_members.trainees.len());
     for (github_login, module_to_prs) in member_to_module_to_prs {
-        let trainee_specific_info = trainee_info.get(&github_login);
+        let trainee_specific_info = batch_members.trainees.get(&github_login);
         let trainee_name =
             trainee_specific_info.map_or_else(|| "unknown".to_owned(), |t| t.name.clone());
         let trainee_email = trainee_specific_info.map(|t| t.email.clone());
@@ -622,19 +656,24 @@ pub async fn get_batch(
             modules.insert(module_name.clone(), module_with_submissions);
         }
         let trainee = TraineeWithSubmissions {
-            github_login,
-            name: trainee_name,
-            email: trainee_email.unwrap_or_else(|| {
-                EmailAddress::from_str("unknown@example.com")
-                    .expect("Known good email didn't parse")
-            }),
-            region,
+            trainee: Trainee {
+                github_login,
+                name: trainee_name,
+                email: trainee_email.unwrap_or_else(|| {
+                    EmailAddress::from_str("unknown@example.com")
+                        .expect("Known good email didn't parse")
+                }),
+                region,
+            },
             modules,
         };
         trainees.push(trainee);
     }
 
-    Ok(Batch { name, trainees })
+    Ok(Batch {
+        name: batch_members.name,
+        trainees,
+    })
 }
 
 fn get_trainee_module_attendance(
