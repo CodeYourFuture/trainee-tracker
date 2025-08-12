@@ -114,8 +114,8 @@
             <tbody>
                 {% for trainee in batch.trainees %}
                     <tr>
-                        <th class="{{ css_classes_for_trainee_status(&trainee.status()) }}">{{ trainee.trainee.name }} - <a href="https://github.com/{{trainee.trainee.github_login}}">@{{ trainee.trainee.github_login }}</a> - {{ trainee.trainee.email }} - {{ trainee.progress_score() / 100 }}%</th>
-                        <td>{{ trainee.trainee.region }}</td>
+                        <th class="{{ css_classes_for_trainee_status(&trainee.status()) }}">{{ trainee.name }} - <a href="https://github.com/{{trainee.github_login}}">@{{ trainee.github_login }}</a> - {{ trainee.email }} - {{ trainee.progress_score() / 100 }}%</th>
+                        <td>{{ trainee.region }}</td>
                         {% for (module_name, module) in trainee.modules %}
                             {% for sprint in module.sprints %}
                                 {% for submission in sprint.submissions %}
