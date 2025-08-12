@@ -195,7 +195,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
     }
     let sprint = sprint.ok_or_else(|| {
         Error::UserFacing(format!(
-            "Failed to parse issue {} - no sprint label",
+            "Failed to parse issue {} - no sprint label.\n\nIf this issue was made my a curriculum team member it should be given a sprint label.\nIf this issue was created by a trainee for step submission, it should probably be closed (and they should create the issue in their fork).",
             html_url
         ))
     })?;
