@@ -15,8 +15,8 @@ use tower_sessions::Session;
 use crate::{
     config::CourseScheduleWithRegisterSheetId,
     course::{
-        fetch_batch_metadata, get_batch, Attendance, Batch, BatchMetadata, Course, Submission,
-        TraineeStatus,
+        fetch_batch_metadata, get_batch_with_submissions, Attendance, Batch, BatchMetadata, Course,
+        Submission, TraineeStatus,
     },
     google_groups::{get_groups, groups_client, GoogleGroup},
     octocrab::{all_pages, octocrab},
@@ -137,7 +137,7 @@ pub async fn get_trainee_batch(
     let course = course_schedule
         .with_assignments(&octocrab, github_org.clone())
         .await?;
-    let mut batch = get_batch(
+    let mut batch = get_batch_with_submissions(
         &octocrab,
         sheets_client,
         &server_state.config.github_email_mapping_sheet_id,
@@ -195,7 +195,7 @@ impl TraineeBatchTemplate {
         let mut total = 0;
         for trainee in &self.batch.trainees {
             if let Some(region) = region {
-                if trainee.region.as_str() != region {
+                if trainee.trainee.region.as_str() != region {
                     continue;
                 }
             }
