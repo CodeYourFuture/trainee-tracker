@@ -40,7 +40,7 @@ async fn main() {
     let fixed_date = NaiveDate::from_ymd_opt(2030, 1, 1).unwrap();
     let mut sprints = IndexMap::new();
     sprints.insert(
-        module_name.clone(),
+        module_name.to_owned(),
         std::iter::repeat_with(|| {
             regions
                 .iter()
@@ -60,10 +60,10 @@ async fn main() {
         register_sheet_id: "".to_owned(),
         course_schedule,
     }
-    .with_assignments(&octocrab, org_name.clone())
+    .with_assignments(&octocrab, &org_name)
     .await
     .expect("Failed to get assignments");
-    let module_prs = get_prs(&octocrab, org_name, module_name.clone(), true)
+    let module_prs = get_prs(&octocrab, &org_name, &module_name, true)
         .await
         .expect("Failed to get PRs");
     let pr_in_question = module_prs

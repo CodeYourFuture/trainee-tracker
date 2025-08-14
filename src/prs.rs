@@ -66,12 +66,12 @@ pub struct Review {
 
 pub async fn get_prs(
     octocrab: &Octocrab,
-    org_name: String,
-    module: String,
+    org_name: &str,
+    module: &str,
     include_complete_closed: bool,
 ) -> Result<Vec<Pr>, Error> {
     let page = octocrab
-        .pulls(org_name, module.clone())
+        .pulls(org_name, module)
         .list()
         .state(if include_complete_closed {
             State::All
@@ -108,7 +108,7 @@ pub async fn get_prs(
                 }
 
                 // For some reason repo is generally None, but we know it, so...
-                let repo_name = module.clone();
+                let repo_name = module.to_owned();
 
                 // Unclear when they API would return None for these, ignore them.
                 let updated_at = updated_at?;
@@ -261,15 +261,15 @@ pub(crate) struct ReviewedPr {
 
 pub(crate) async fn get_reviewers(
     octocrab: Octocrab,
-    github_org: String,
+    github_org: &str,
     module_names: &[String],
 ) -> Result<BTreeSet<ReviewerInfo>, Error> {
     let mut futures = Vec::new();
     for module in module_names {
         let octocrab = octocrab.clone();
-        let github_org = github_org.clone();
+        let github_org = github_org.to_owned();
         futures.push(async move {
-            let prs = get_prs(&octocrab, github_org.clone(), module.clone(), true).await?;
+            let prs = get_prs(&octocrab, &github_org, module, true).await?;
             fill_in_reviewers(octocrab, github_org, prs).await
         });
     }
@@ -350,17 +350,17 @@ enum CommentsOrReviews {
 }
 
 // Ideally this would be a more general shared function, but async closures aren't super stable yet.
-async fn get_full_page(
+async fn get_full_page<S1: AsRef<str>, S2: AsRef<str>>(
     octocrab: Octocrab,
-    github_org: String,
-    repo_name: String,
+    github_org: S1,
+    repo_name: S2,
     number: u64,
     comments_or_reviews: CommentsOrReviews,
 ) -> Result<Vec<Review>, anyhow::Error> {
     match comments_or_reviews {
         CommentsOrReviews::Comments => {
             let page = octocrab
-                .pulls(github_org, repo_name)
+                .pulls(github_org.as_ref(), repo_name.as_ref())
                 .list_comments(Some(number))
                 .send()
                 .await
@@ -385,7 +385,7 @@ async fn get_full_page(
         }
         CommentsOrReviews::Reviews => {
             let page = octocrab
-                .pulls(github_org, repo_name)
+                .pulls(github_org.as_ref(), repo_name.as_ref())
                 .list_reviews(number)
                 .send()
                 .await

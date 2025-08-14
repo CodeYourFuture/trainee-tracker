@@ -50,15 +50,9 @@ async fn main() {
         register_sheet_id: "".to_owned(),
         course_schedule,
     };
-    let result = validate_pr(
-        &octocrab,
-        course,
-        module_name.clone(),
-        github_org_name.clone(),
-        pr_number,
-    )
-    .await
-    .expect("Failed to validate PR");
+    let result = validate_pr(&octocrab, course, &module_name, &github_org_name, pr_number)
+        .await
+        .expect("Failed to validate PR");
     match result {
         ValidationResult::Ok => {}
         ValidationResult::CouldNotMatch => {
@@ -103,16 +97,16 @@ enum ValidationResult {
 async fn validate_pr(
     octocrab: &Octocrab,
     course_schedule: CourseScheduleWithRegisterSheetId,
-    module_name: String,
-    github_org_name: String,
+    module_name: &str,
+    github_org_name: &str,
     pr_number: u64,
 ) -> Result<ValidationResult, Error> {
     let course = course_schedule
-        .with_assignments(&octocrab, github_org_name.clone())
+        .with_assignments(&octocrab, github_org_name)
         .await
         .map_err(|err| err.context("Failed to get assignments"))?;
 
-    let module_prs = get_prs(&octocrab, github_org_name, module_name.clone(), false)
+    let module_prs = get_prs(&octocrab, github_org_name, module_name, false)
         .await
         .map_err(|err| err.context("Failed to get PRs"))?;
     let pr_in_question = module_prs
@@ -131,7 +125,7 @@ async fn validate_pr(
         .filter(|pr| pr.author == pr_in_question.author)
         .collect();
     let matched = match_prs_to_assignments(
-        &course.modules[&module_name],
+        &course.modules[module_name],
         user_prs,
         Vec::new(),
         &Region("London".to_owned()),

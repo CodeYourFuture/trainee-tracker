@@ -36,7 +36,7 @@ impl CourseScheduleWithRegisterSheetId {
     pub async fn with_assignments(
         &self,
         octocrab: &Octocrab,
-        github_org: String,
+        github_org: &str,
     ) -> Result<Course, Error> {
         let mut modules = IndexMap::new();
         let mut module_futures = Vec::new();
@@ -58,8 +58,8 @@ impl CourseScheduleWithRegisterSheetId {
             );
             module_futures.push(Self::fetch_module_assignments(
                 octocrab,
-                github_org.clone(),
-                module_name.clone(),
+                github_org,
+                module_name,
                 module_sprint_dates.len(),
             ));
         }
@@ -94,8 +94,8 @@ impl CourseScheduleWithRegisterSheetId {
 
     pub async fn fetch_module_assignments(
         octocrab: &Octocrab,
-        github_org: String,
-        module_name: String,
+        github_org: &str,
+        module_name: &str,
         sprint_count: usize,
     ) -> Result<Vec<Vec<Assignment>>, Error> {
         let mut sprints = std::iter::repeat_with(Vec::new)
@@ -524,8 +524,8 @@ pub async fn get_batch_members(
     octocrab: &Octocrab,
     sheets_client: SheetsClient,
     github_email_mapping_sheet_id: &str,
-    github_org: String,
-    batch_github_slug: String,
+    github_org: &str,
+    batch_github_slug: &str,
     extra_trainees: BTreeMap<GithubLogin, Trainee>,
 ) -> Result<BatchMembers, Error> {
     let trainee_info = get_trainees(
@@ -537,8 +537,8 @@ pub async fn get_batch_members(
 
     let members = all_pages("members", octocrab, async || {
         octocrab
-            .teams(github_org.clone())
-            .members(batch_github_slug.clone())
+            .teams(github_org)
+            .members(batch_github_slug)
             .send()
             .await
     })
@@ -550,7 +550,7 @@ pub async fn get_batch_members(
         .collect::<BTreeSet<_>>();
 
     let team = octocrab
-        .teams(github_org.clone())
+        .teams(github_org)
         .get(batch_github_slug)
         .await
         .context("Failed to get team")?;
@@ -572,8 +572,8 @@ pub async fn get_batch_with_submissions(
     octocrab: &Octocrab,
     sheets_client: SheetsClient,
     github_email_mapping_sheet_id: &str,
-    github_org: String,
-    batch_github_slug: String,
+    github_org: &str,
+    batch_github_slug: &str,
     course: &Course,
     extra_trainees: BTreeMap<GithubLogin, Trainee>,
 ) -> Result<Batch, Error> {
@@ -589,7 +589,7 @@ pub async fn get_batch_with_submissions(
         octocrab,
         sheets_client,
         github_email_mapping_sheet_id,
-        github_org.clone(),
+        github_org,
         batch_github_slug,
         extra_trainees,
     )
@@ -598,7 +598,7 @@ pub async fn get_batch_with_submissions(
     let pr_futures = course
         .modules
         .keys()
-        .map(|module| get_prs(octocrab, github_org.clone(), module.clone(), true))
+        .map(|module| get_prs(octocrab, &github_org, &module, true))
         .collect::<Vec<_>>();
     let prs_by_module = join_all(pr_futures)
         .await

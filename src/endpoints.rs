@@ -170,10 +170,10 @@ pub async fn course_prs(
         .flat_map(|(_batch_name, course_schedule)| course_schedule.sprints.keys().cloned())
     {
         let octocrab = octocrab.clone();
-        let github_org = server_state.config.github_org.clone();
+        let github_org = &server_state.config.github_org;
         futures.push(async move {
-            let prs = get_prs(&octocrab, github_org.clone(), module.clone(), true).await?;
-            fill_in_reviewers(octocrab.clone(), github_org, prs).await
+            let prs = get_prs(&octocrab, &github_org, &module, true).await?;
+            fill_in_reviewers(octocrab.clone(), github_org.to_owned(), prs).await
         });
     }
     let mut prs = Vec::new();

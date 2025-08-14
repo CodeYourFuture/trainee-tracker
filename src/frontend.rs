@@ -128,21 +128,21 @@ pub async fn get_trainee_batch(
     Path((course, batch_github_slug)): Path<(String, String)>,
 ) -> Result<Html<String>, Error> {
     let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
-    let github_org = server_state.config.github_org.clone();
+    let github_org = &server_state.config.github_org;
     let course_schedule = server_state
         .config
         .get_course_schedule_with_register_sheet_id(course.clone(), &batch_github_slug)
         .ok_or_else(|| Error::Fatal(anyhow::anyhow!("Course not found: {course}")))?;
     let octocrab = octocrab(&session, &server_state, original_uri).await?;
     let course = course_schedule
-        .with_assignments(&octocrab, github_org.clone())
+        .with_assignments(&octocrab, github_org)
         .await?;
     let mut batch = get_batch_with_submissions(
         &octocrab,
         sheets_client,
         &server_state.config.github_email_mapping_sheet_id,
         github_org,
-        batch_github_slug,
+        &batch_github_slug,
         &course,
         server_state.config.extra_trainee_github_mappings,
     )
@@ -234,7 +234,7 @@ pub async fn get_reviewers(
     };
 
     let octocrab = octocrab(&session, &server_state, original_uri).await?;
-    let github_org = server_state.config.github_org.clone();
+    let github_org = &server_state.config.github_org;
     let module_names = server_state
         .config
         .get_course_module_names(&course)
