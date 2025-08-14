@@ -598,7 +598,7 @@ pub async fn get_batch_with_submissions(
     let pr_futures = course
         .modules
         .keys()
-        .map(|module| get_prs(octocrab, &github_org, &module, true))
+        .map(|module| get_prs(octocrab, github_org, module, true))
         .collect::<Vec<_>>();
     let prs_by_module = join_all(pr_futures)
         .await

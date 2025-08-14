@@ -62,10 +62,10 @@ async fn main() {
         register_sheet_id: "".to_owned(),
         course_schedule,
     }
-    .with_assignments(&octocrab, &org_name)
+    .with_assignments(&octocrab, org_name)
     .await
     .expect("Failed to get assignments");
-    let module_prs = get_prs(&octocrab, &org_name, &module_name, true)
+    let module_prs = get_prs(&octocrab, org_name, module_name, true)
         .await
         .expect("Failed to get PRs");
     let pr_in_question = module_prs
