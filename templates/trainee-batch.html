@@ -108,7 +108,7 @@
                     {% for (module_name, module) in course.modules %}
                         {% for sprint in module.sprints %}
                             {% for assignment in sprint.assignments %}
-                                <th>{{ assignment.heading() }}</th>
+                                <th>{{ assignment.heading() | safe }}</th>
                             {% endfor %}
                         {% endfor %}
                     {% endfor %}

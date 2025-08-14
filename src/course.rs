@@ -27,6 +27,7 @@ use octocrab::{
 };
 use regex::Regex;
 use serde::Serialize;
+use url::Url;
 
 impl CourseScheduleWithRegisterSheetId {
     pub fn module_names(&self) -> Vec<String> {
@@ -223,6 +224,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
         "None" => None,
         "PR" => Some(Assignment::ExpectedPullRequest {
             title: title.clone(),
+            html_url: html_url.clone(),
             optionality,
         }),
         "Issue" => {
@@ -300,6 +302,7 @@ pub enum Assignment {
     },
     ExpectedPullRequest {
         title: String,
+        html_url: Url,
         optionality: AssignmentOptionality,
     },
 }
@@ -317,7 +320,9 @@ impl Assignment {
             Assignment::Attendance {
                 class_dates: _class_dates,
             } => "Attendance".to_owned(),
-            Assignment::ExpectedPullRequest { title, .. } => format!("PR: {title}"),
+            Assignment::ExpectedPullRequest {
+                title, html_url, ..
+            } => format!("<a href=\"{html_url}\">PR: {title}</a>"),
         }
     }
 }
@@ -935,6 +940,7 @@ fn match_pr_to_assignment(
                 Assignment::ExpectedPullRequest {
                     title: expected_title,
                     optionality,
+                    ..
                 } => {
                     let mut assignment_title_words = make_title_more_matchable(expected_title);
                     if let Some(claimed_sprint_index) = claimed_sprint_index {
