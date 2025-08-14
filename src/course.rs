@@ -46,7 +46,7 @@ impl CourseScheduleWithRegisterSheetId {
                 module_name.clone(),
                 Module {
                     sprints: module_sprint_dates
-                        .into_iter()
+                        .iter()
                         .map(|class_dates| Sprint {
                             assignments: vec![Assignment::Attendance {
                                 class_dates: class_dates.clone(),
@@ -108,7 +108,7 @@ impl CourseScheduleWithRegisterSheetId {
         .await
         .map_err(|err| err.context("Failed to fetch module issues"))?;
 
-        issues.sort_by_cached_key(|&Issue { ref title, .. }| title.clone());
+        issues.sort_by_cached_key(|Issue { title, .. }| title.clone());
 
         for issue in issues {
             if let Some((sprint_number, assignment)) = parse_issue(&issue)? {
@@ -201,7 +201,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
     })?;
     // TODO
     // let assignment = assignment.ok_or_else(|| Error::UserFacing(format!("Failed to parse issue {} - no submit label", html_url)))?;
-    let assignment = assignment.or_else(|| Some(None)).unwrap();
+    let assignment = assignment.unwrap_or(None);
     Ok(Some((sprint, assignment)))
 }
 
@@ -303,7 +303,7 @@ impl Batch {
             let count = region_counts
                 .entry(trainee.trainee.region.clone())
                 .or_default();
-            *count = *count + 1;
+            *count += 1;
         }
         let mut region_counts = region_counts.into_iter().collect::<Vec<_>>();
         region_counts.sort_by_key(|(_region, count)| *count);
@@ -485,10 +485,10 @@ pub enum Attendance {
 impl Attendance {
     pub fn register_url(&self) -> &str {
         match self {
-            Attendance::Absent { register_url } => &register_url,
-            Attendance::OnTime { register_url } => &register_url,
-            Attendance::Late { register_url } => &register_url,
-            Attendance::WrongDay { register_url } => &register_url,
+            Attendance::Absent { register_url } => register_url,
+            Attendance::OnTime { register_url } => register_url,
+            Attendance::Late { register_url } => register_url,
+            Attendance::WrongDay { register_url } => register_url,
         }
     }
 }
@@ -506,7 +506,7 @@ pub(crate) async fn fetch_batch_metadata(
     let teams = all_pages("teams", octocrab, async || {
         octocrab
             .teams(github_org)
-            .list_children(&format!("{}-trainees", course_name))
+            .list_children(format!("{}-trainees", course_name))
             .send()
             .await
     })
@@ -642,11 +642,11 @@ pub async fn get_batch_with_submissions(
                 &register_info,
                 module_name,
                 trainee_email.clone(),
-                &course,
+                course,
                 &region,
             )?;
             let module_with_submissions = match_prs_to_assignments(
-                &module,
+                module,
                 module_to_prs[&module_name].clone(),
                 module_attendance,
                 &region,
@@ -793,6 +793,8 @@ pub fn match_prs_to_assignments(
         }
     }
 
+    let number_regex = Regex::new(r"(\d+)").unwrap();
+
     let mut unknown_prs = Vec::new();
     for pr in prs {
         let title_lower = pr.title.to_lowercase();
@@ -803,7 +805,6 @@ pub fn match_prs_to_assignments(
         let mut sprint_index = None;
         for title_part in title_parts {
             if title_part.starts_with("sprint") || title_part.starts_with("week") {
-                let number_regex = Regex::new(r"(\d+)").unwrap();
                 if let Some(number_match) = number_regex
                     .captures(title_part)
                     .and_then(|captures| captures.get(1))
@@ -837,8 +838,8 @@ pub fn match_prs_to_assignments(
 fn match_pr_to_assignment(
     pr: Pr,
     claimed_sprint_index: Option<usize>,
-    assignments: &Vec<Sprint>,
-    submissions: &mut Vec<SprintWithSubmissions>,
+    assignments: &[Sprint],
+    submissions: &mut [SprintWithSubmissions],
     unknown_prs: &mut Vec<Pr>,
 ) {
     #[derive(Clone, Copy)]
@@ -902,10 +903,8 @@ fn match_pr_to_assignment(
     {
         submissions[sprint_index].submissions[assignment_index] =
             SubmissionState::Some(Submission::PullRequest { pull_request: pr });
-    } else {
-        if !pr.is_closed {
-            unknown_prs.push(pr);
-        }
+    } else if !pr.is_closed {
+        unknown_prs.push(pr);
     }
 }
 

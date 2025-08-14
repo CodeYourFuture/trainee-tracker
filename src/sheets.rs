@@ -90,7 +90,7 @@ impl SheetsClient {
                     make_redirect_uri(
                         &self.server_state,
                         self.original_uri,
-                        &&redirect_endpoint(&self.server_state),
+                        &redirect_endpoint(&self.server_state),
                         GoogleScope::Sheets,
                     )
                     .await?,

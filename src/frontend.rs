@@ -38,7 +38,7 @@ pub async fn list_courses(
     let batch_metadata = join_all(
         courses
             .keys()
-            .map(|course_name| fetch_batch_metadata(&octocrab, github_org.clone(), &course_name)),
+            .map(|course_name| fetch_batch_metadata(&octocrab, github_org.clone(), course_name)),
     )
     .await
     .into_iter()
