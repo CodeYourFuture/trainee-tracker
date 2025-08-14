@@ -163,7 +163,8 @@ fn make_fake_course_schedule(module_name: String) -> CourseSchedule {
     sprints.insert(
         module_name,
         std::iter::repeat_with(|| btreemap![ARBITRARY_REGION => fixed_date])
-            .take(3)
+            // 4 is the max number of sprints a module (currently) contains.
+            .take(4)
             .collect(),
     );
     CourseSchedule {
