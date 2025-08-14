@@ -145,6 +145,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
     let mut sprint = None;
 
     let mut submit_label = None;
+    let mut optionality = None;
 
     for label in labels {
         if let Some(sprint_number) = label.name.strip_prefix("📅 Sprint ") {
@@ -175,12 +176,30 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
             }
             submit_label = Some(label);
         }
+
+        if label.name == "🏕 Priority Mandatory" {
+            if optionality.is_some() {
+                return Err(Error::UserFacing(format!(
+                    "Failed to parse issue {} - duplicate priority labels",
+                    html_url
+                )));
+            }
+            optionality = Some(AssignmentOptionality::Mandatory)
+        } else if label.name == "🏝️ Priority Stretch" {
+            if optionality.is_some() {
+                return Err(Error::UserFacing(format!(
+                    "Failed to parse issue {} - duplicate priority labels",
+                    html_url
+                )));
+            }
+            optionality = Some(AssignmentOptionality::Stretch)
+        }
     }
 
     let sprint = sprint.ok_or_else(|| {
         Error::UserFacing(format!(
-            "Failed to parse issue {} - no sprint label.\n\nIf this issue was made my a curriculum team member it should be given a sprint label.\nIf this issue was created by a trainee for step submission, it should probably be closed (and they should create the issue in their fork).",
-            html_url
+            "Failed to parse issue {} - no sprint label.{}",
+            html_url, BAD_LABEL_SUFFIX,
         ))
     })?;
 
@@ -193,10 +212,18 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
         }
     };
 
+    let optionality = optionality.ok_or_else(|| {
+        Error::UserFacing(format!(
+            "Failed to parse issue {} - no priority label.{}",
+            html_url, BAD_LABEL_SUFFIX
+        ))
+    })?;
+
     let assignment = match submit_label {
         "None" => None,
         "PR" => Some(Assignment::ExpectedPullRequest {
             title: title.clone(),
+            optionality,
         }),
         "Issue" => {
             // TODO: Handle these.
@@ -212,6 +239,8 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
 
     Ok(Some((sprint, assignment)))
 }
+
+const BAD_LABEL_SUFFIX: &str = "\n\nIf this issue was made my a curriculum team member it should be given a sprint label.\nIf this issue was created by a trainee for step submission, it should probably be closed (and they should create the issue in their fork).";
 
 #[derive(Serialize)]
 pub struct Course {
@@ -271,18 +300,32 @@ pub enum Assignment {
     },
     ExpectedPullRequest {
         title: String,
+        optionality: AssignmentOptionality,
     },
 }
 
 impl Assignment {
+    pub fn optionality(&self) -> AssignmentOptionality {
+        match self {
+            Assignment::Attendance { .. } => AssignmentOptionality::Mandatory,
+            Assignment::ExpectedPullRequest { optionality, .. } => optionality.clone(),
+        }
+    }
+
     pub fn heading(&self) -> String {
         match self {
             Assignment::Attendance {
                 class_dates: _class_dates,
             } => "Attendance".to_owned(),
-            Assignment::ExpectedPullRequest { title } => format!("PR: {title}"),
+            Assignment::ExpectedPullRequest { title, .. } => format!("PR: {title}"),
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum AssignmentOptionality {
+    Mandatory,
+    Stretch,
 }
 
 pub struct BatchMembers {
@@ -371,11 +414,18 @@ impl TraineeWithSubmissions {
                                 Attendance::Absent { .. } => {}
                             }
                         }
-                        SubmissionState::Some(Submission::PullRequest { pull_request }) => {
-                            denominator += 10;
+                        SubmissionState::Some(Submission::PullRequest {
+                            pull_request,
+                            optionality,
+                        }) => {
+                            let max = match optionality {
+                                AssignmentOptionality::Mandatory => 10,
+                                AssignmentOptionality::Stretch => 12,
+                            };
+                            denominator += max;
                             match pull_request.state {
                                 PrState::Complete => {
-                                    numerator += 10;
+                                    numerator += max;
                                 }
                                 PrState::NeedsReview | PrState::Reviewed => {
                                     numerator += 6;
@@ -389,6 +439,9 @@ impl TraineeWithSubmissions {
                             Assignment::Attendance { .. } => denominator += 20,
                             Assignment::ExpectedPullRequest { .. } => denominator += 10,
                         },
+                        SubmissionState::MissingStretch(_) => {
+                            denominator += 2;
+                        }
                         SubmissionState::MissingButNotExpected(_) => {}
                     }
                 }
@@ -444,15 +497,17 @@ pub struct SprintWithSubmissions {
 pub enum SubmissionState {
     Some(Submission),
     MissingButExpected(Assignment),
+    MissingStretch(Assignment),
     MissingButNotExpected(Assignment),
 }
 
 impl SubmissionState {
-    fn is_missing(&self) -> bool {
+    fn is_submitted(&self) -> bool {
         match self {
-            Self::Some(_) => false,
-            Self::MissingButExpected(_) => true,
-            Self::MissingButNotExpected(_) => true,
+            Self::Some(_) => true,
+            Self::MissingButExpected(_) => false,
+            Self::MissingStretch(_) => false,
+            Self::MissingButNotExpected(_) => false,
         }
     }
 }
@@ -460,7 +515,10 @@ impl SubmissionState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Submission {
     Attendance(Attendance),
-    PullRequest { pull_request: Pr },
+    PullRequest {
+        pull_request: Pr,
+        optionality: AssignmentOptionality,
+    },
 }
 
 impl Submission {
@@ -470,14 +528,14 @@ impl Submission {
             Self::Attendance(Attendance::OnTime { .. }) => String::from("On time"),
             Self::Attendance(Attendance::Late { .. }) => String::from("Late"),
             Self::Attendance(Attendance::WrongDay { .. }) => String::from("Wrong day"),
-            Self::PullRequest { pull_request } => format!("#{}", pull_request.number),
+            Self::PullRequest { pull_request, .. } => format!("#{}", pull_request.number),
         }
     }
 
     pub fn link(&self) -> String {
         match self {
             Self::Attendance(attendance) => attendance.register_url().to_owned(),
-            Self::PullRequest { pull_request } => pull_request.url.clone(),
+            Self::PullRequest { pull_request, .. } => pull_request.url.clone(),
         }
     }
 }
@@ -774,20 +832,21 @@ pub fn match_prs_to_assignments(
 ) -> Result<ModuleWithSubmissions, Error> {
     let mut sprints = Vec::with_capacity(module.sprints.len());
     for (sprint_index, sprint) in module.sprints.iter().enumerate() {
-        sprints.push(SprintWithSubmissions {
-            submissions: vec![
-                if sprint.is_in_past(region) {
-                    SubmissionState::MissingButExpected(Assignment::Attendance {
-                        class_dates: sprint.dates.clone(),
-                    })
-                } else {
-                    SubmissionState::MissingButNotExpected(Assignment::Attendance {
-                        class_dates: sprint.dates.clone(),
-                    })
-                };
-                sprint.assignment_count()
-            ],
-        });
+        let mut submissions = Vec::with_capacity(sprint.assignment_count());
+        for assignment in sprint.assignments.iter().cloned() {
+            let submission = if sprint.is_in_past(region) {
+                match assignment.optionality() {
+                    AssignmentOptionality::Mandatory => {
+                        SubmissionState::MissingButExpected(assignment)
+                    }
+                    AssignmentOptionality::Stretch => SubmissionState::MissingStretch(assignment),
+                }
+            } else {
+                SubmissionState::MissingButNotExpected(assignment)
+            };
+            submissions.push(submission);
+        }
+        sprints.push(SprintWithSubmissions { submissions });
 
         for (assignment_index, assignment) in sprint.assignments.iter().enumerate() {
             if let Assignment::Attendance {
@@ -855,6 +914,7 @@ fn match_pr_to_assignment(
         match_count: usize,
         sprint_index: usize,
         assignment_index: usize,
+        optionality: AssignmentOptionality,
     }
 
     let mut best_match: Option<Match> = None;
@@ -874,6 +934,7 @@ fn match_pr_to_assignment(
             match assignment {
                 Assignment::ExpectedPullRequest {
                     title: expected_title,
+                    optionality,
                 } => {
                     let mut assignment_title_words = make_title_more_matchable(expected_title);
                     if let Some(claimed_sprint_index) = claimed_sprint_index {
@@ -885,7 +946,7 @@ fn match_pr_to_assignment(
                         }
                     }
                     let match_count = assignment_title_words.intersection(&pr_title_words).count();
-                    if submissions[sprint_index].submissions[assignment_index].is_missing()
+                    if !submissions[sprint_index].submissions[assignment_index].is_submitted()
                         && match_count
                             > best_match
                                 .as_ref()
@@ -896,6 +957,7 @@ fn match_pr_to_assignment(
                             match_count,
                             sprint_index,
                             assignment_index,
+                            optionality: optionality.clone(),
                         });
                     }
                 }
@@ -906,11 +968,15 @@ fn match_pr_to_assignment(
     if let Some(Match {
         sprint_index,
         assignment_index,
+        optionality,
         ..
     }) = best_match
     {
         submissions[sprint_index].submissions[assignment_index] =
-            SubmissionState::Some(Submission::PullRequest { pull_request: pr });
+            SubmissionState::Some(Submission::PullRequest {
+                pull_request: pr,
+                optionality,
+            });
     } else if !pr.is_closed {
         unknown_prs.push(pr);
     }

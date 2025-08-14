@@ -6,6 +6,7 @@
                 --green: #adf7c7;
                 --orange: #f8bca3;
                 --red: #ffaaaa;
+                --yellow: #e6f4ae;
             }
             th, td {
                 border: 1px black solid;
@@ -18,13 +19,16 @@
                 background-color: var(--green);
             }
             td.attendance-late {
-                background-color: #e6f4ae;
+                background-color: var(--yellow);
             }
             td.attendance-wrong-day {
                 background-color: grey;
             }
             td.pr-missing {
                 background-color: var(--red);
+            }
+            td.pr-missing-stretch {
+                background-color: var(--yellow);
             }
             td.pr-complete {
                 background-color: var(--green);
@@ -38,7 +42,6 @@
             td.pr-unknown {
                 background-color: grey;
             }
-
             .trainee-on-track {
                 background-color: var(--green);
             }
@@ -124,6 +127,8 @@
                                         <td class="{{ css_classes_for_submission(submission) }}"><a href="{{ submission.link() }}">{{ submission.display_text() }}</a></td>
                                         {% when crate::course::SubmissionState::MissingButExpected(_) %}
                                         <td class="pr-missing"></td>
+                                        {% when crate::course::SubmissionState::MissingStretch(_) %}
+                                        <td class="pr-missing-stretch"></td>
                                         {% when crate::course::SubmissionState::MissingButNotExpected(_) %}
                                         <td></td>
                                     {% endmatch %}
