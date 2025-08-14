@@ -1,4 +1,4 @@
-use std::process::exit;
+use std::{collections::BTreeMap, process::exit};
 
 use chrono::NaiveDate;
 use indexmap::IndexMap;
@@ -35,6 +35,16 @@ async fn main() {
         }
     };
 
+    // TODO: Fetch this from classplanner or somewhere when we have access to a useful API.
+    let known_region_aliases = KnownRegions(btreemap! {
+        "Cape Town" => vec!["South Africa", "SouthAfrica", "ZA", "ZA Cape Town"],
+        "Glasgow" => vec!["Scotland"],
+        "London" => vec![],
+        "North West" => vec!["NW", "Manchester"],
+        "Sheffield" => vec![],
+        "West Midlands" => vec!["WM", "WestMidlands", "West-Midlands", "Birmingham"],
+    });
+
     let github_token =
         std::env::var("GH_TOKEN").expect("GH_TOKEN wasn't set - must be set to a GitHub API token");
     let octocrab = octocrab_for_token(github_token).expect("Failed to get octocrab");
@@ -46,9 +56,16 @@ async fn main() {
         register_sheet_id: "".to_owned(),
         course_schedule,
     };
-    let result = validate_pr(&octocrab, course, &module_name, &github_org_name, pr_number)
-        .await
-        .expect("Failed to validate PR");
+    let result = validate_pr(
+        &octocrab,
+        course,
+        &module_name,
+        &github_org_name,
+        pr_number,
+        &known_region_aliases,
+    )
+    .await
+    .expect("Failed to validate PR");
     match result {
         ValidationResult::Ok => {}
         ValidationResult::CouldNotMatch => {
@@ -69,6 +86,15 @@ async fn main() {
                 .expect("Failed to create comment with validation error");
             exit(2);
         }
+        ValidationResult::UnknownRegion => {
+            eprintln!("Validation error: Could not find region in PR title");
+            octocrab
+                .issues(github_org_name, module_name.clone())
+                .create_comment(pr_number, UNKNOWN_REGION_COMMENT)
+                .await
+                .expect("Failed to create comment with validation error");
+            exit(2);
+        }
     }
 }
 
@@ -80,14 +106,19 @@ If this PR is not coursework, please add the NotCoursework label (and message on
 
 const BAD_TITLE_COMMENT_PREFIX: &str = r#"Your PR's title isn't in the expected format.
 
-Please check its title is in the correct format, and update it.
+Please check the expected title format, and update yours to match.
 
 Reason: "#;
+
+const UNKNOWN_REGION_COMMENT: &str = r#"Your PR's title didn't contain a known region.
+
+Please check the expected title format, and make sure your region is in the correct place and spelled correctly."#;
 
 enum ValidationResult {
     Ok,
     CouldNotMatch,
     BadTitleFormat { reason: String },
+    UnknownRegion,
 }
 
 async fn validate_pr(
@@ -96,6 +127,7 @@ async fn validate_pr(
     module_name: &str,
     github_org_name: &str,
     pr_number: u64,
+    known_region_aliases: &KnownRegions,
 ) -> Result<ValidationResult, Error> {
     let course = course_schedule
         .with_assignments(octocrab, github_org_name)
@@ -124,7 +156,7 @@ async fn validate_pr(
         &course.modules[module_name],
         user_prs,
         Vec::new(),
-        &Region("London".to_owned()),
+        &ARBITRARY_REGION,
     )
     .map_err(|err| err.context("Failed to match PRs to assignments"))?;
 
@@ -140,7 +172,11 @@ async fn validate_pr(
             reason: "Wrong number of parts separated by |s".to_owned(),
         });
     }
-    // TODO: Validate Regions when they're known (0)
+
+    if !known_region_aliases.is_known_ignoring_case(title_sections[0].trim()) {
+        return Ok(ValidationResult::UnknownRegion);
+    }
+
     // TODO: Validate cohorts when they're known (1)
     let sprint_regex = Regex::new(r"^(S|s)print \d+$").unwrap();
     let sprint_section = title_sections[3].trim();
@@ -155,6 +191,25 @@ async fn validate_pr(
     }
 
     Ok(ValidationResult::Ok)
+}
+
+struct KnownRegions(BTreeMap<&'static str, Vec<&'static str>>);
+
+impl KnownRegions {
+    fn is_known_ignoring_case(&self, possible_region: &str) -> bool {
+        let possible_region_lower = possible_region.to_ascii_lowercase();
+        for (known_region, known_region_aliases) in &self.0 {
+            if known_region.to_ascii_lowercase() == possible_region_lower {
+                return true;
+            }
+            for known_region_alias in known_region_aliases {
+                if known_region_alias.to_ascii_lowercase() == possible_region_lower {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 fn make_fake_course_schedule(module_name: String) -> CourseSchedule {
