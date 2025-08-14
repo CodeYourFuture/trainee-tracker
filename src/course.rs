@@ -229,6 +229,10 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
             // TODO: Handle these.
             None
         }
+        "Slack" => {
+            // TODO: Handle these.
+            None
+        }
         other => {
             return Err(Error::UserFacing(format!(
                 "Failed to parse issue {} - submit label wasn't recognised: {}",
