@@ -12,7 +12,8 @@ use trainee_tracker::{
 
 #[tokio::main]
 async fn main() {
-    let Ok([_argv0, github_token, pr_link]) = <[_; 3]>::try_from(std::env::args().collect::<Vec<_>>())
+    let Ok([_argv0, github_token, pr_link]) =
+        <[_; 3]>::try_from(std::env::args().collect::<Vec<_>>())
     else {
         eprintln!("Expected two args - github token and PR link");
         exit(1);
