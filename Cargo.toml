@@ -49,3 +49,9 @@ tower-sessions = "0.14.0"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 uuid = { version = "1.17.0", features = ["serde", "v4"] }
+
+[lints.clippy]
+# foo.clone() feels more clear than *foo for copying.
+clone_on_copy = "allow"
+# Because only idents not expressions are allowed inline, sometimes switching between the two leaves reasonable code Clippy dislikes.
+uninlined_format_args = "allow"

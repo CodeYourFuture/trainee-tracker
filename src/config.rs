@@ -21,8 +21,10 @@ pub struct Config {
     /// Courses being tracked. Keys are things like "itp" or "sdc".
     /// Ideally this would be less hard-coded.
     /// Possible sources of truth for this are:
+    ///
     ///  * GitHub team structure (except that lacks dates)
     ///  * Class Planner API (except that has fiddly auth)
+    ///
     /// We assume the following GitHub team structure:
     ///  ${course}-trainees contains groups of batches of trainees.
     ///  ${course}-mentors is a group of reviewers.
@@ -56,15 +58,13 @@ impl Config {
         batch: &str,
     ) -> Option<CourseScheduleWithRegisterSheetId> {
         if let Some(course_info) = self.courses.get(&course_name) {
-            if let Some(course_schedule) = course_info.batches.get(batch) {
-                Some(CourseScheduleWithRegisterSheetId {
+            course_info.batches.get(batch).map(|course_schedule| {
+                CourseScheduleWithRegisterSheetId {
                     name: course_name,
                     course_schedule: course_schedule.clone(),
                     register_sheet_id: course_info.register_sheet_id.clone(),
-                })
-            } else {
-                None
-            }
+                }
+            })
         } else {
             None
         }

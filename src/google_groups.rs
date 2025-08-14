@@ -104,12 +104,12 @@ pub(crate) async fn get_groups(client: &Client) -> Result<GoogleGroups, Error> {
                 members: members
                     .into_iter()
                     .map(|Member { email, .. }| {
-                        Ok(EmailAddress::from_str(&email).with_context(|| {
+                        EmailAddress::from_str(&email).with_context(|| {
                             format!(
                                 "Failed to parse group member email address {} (member of {})",
                                 email, group.email
                             )
-                        })?)
+                        })
                     })
                     .collect::<Result<_, anyhow::Error>>()?,
             })

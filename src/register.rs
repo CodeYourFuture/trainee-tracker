@@ -126,7 +126,7 @@ fn read_module(
             let cells = row.values;
             // Some sheets have documentation or pivot table
             if row_number == 0
-                && cells.len() >= 1
+                && !cells.is_empty()
                 && cell_string(&cells[0]).unwrap_or_default() != "Name"
             {
                 continue 'sheet;
@@ -150,7 +150,7 @@ fn read_module(
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 if headings
-                    != &[
+                    != [
                         "Name",
                         "Email",
                         "Timestamp",

@@ -110,7 +110,7 @@ pub async fn handle_google_oauth_callback(
     let mut client = Client::new(
         server_state.config.google_apis_client_id.clone(),
         (*server_state.config.google_apis_client_secret).clone(),
-        String::from(redirect_uri),
+        redirect_uri,
         String::new(),
         String::new(),
     );

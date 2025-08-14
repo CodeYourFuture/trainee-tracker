@@ -75,7 +75,7 @@ fn reviewer_staff_detail_from_sheet(
             );
 
             let notes = match cells.get(6) {
-                Some(cell) => cell_string(&cell).context("Failed to read reviewer notes")?,
+                Some(cell) => cell_string(cell).context("Failed to read reviewer notes")?,
                 None => String::new(),
             };
 

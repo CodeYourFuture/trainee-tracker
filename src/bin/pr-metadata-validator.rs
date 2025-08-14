@@ -72,13 +72,13 @@ async fn main() {
     }
 }
 
-const COULD_NOT_MATCH_COMMENT: &'static str = r#"Your PR couldn't be matched to an assignment in this module.
+const COULD_NOT_MATCH_COMMENT: &str = r#"Your PR couldn't be matched to an assignment in this module.
 
 Please check its title is in the correct format, and that you only have one PR per assignment.
 
 If this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed)."#;
 
-const BAD_TITLE_COMMENT_PREFIX: &'static str = r#"Your PR's title isn't in the expected format.
+const BAD_TITLE_COMMENT_PREFIX: &str = r#"Your PR's title isn't in the expected format.
 
 Please check its title is in the correct format, and update it.
 
@@ -98,11 +98,11 @@ async fn validate_pr(
     pr_number: u64,
 ) -> Result<ValidationResult, Error> {
     let course = course_schedule
-        .with_assignments(&octocrab, github_org_name)
+        .with_assignments(octocrab, github_org_name)
         .await
         .map_err(|err| err.context("Failed to get assignments"))?;
 
-    let module_prs = get_prs(&octocrab, github_org_name, module_name, false)
+    let module_prs = get_prs(octocrab, github_org_name, module_name, false)
         .await
         .map_err(|err| err.context("Failed to get PRs"))?;
     let pr_in_question = module_prs
