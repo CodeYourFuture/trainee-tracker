@@ -143,7 +143,9 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
     } = issue;
 
     let mut sprint = None;
-    let mut assignment = None;
+
+    let mut submit_label = None;
+
     for label in labels {
         if let Some(sprint_number) = label.name.strip_prefix("📅 Sprint ") {
             if sprint.is_some() {
@@ -164,44 +166,50 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
                 }
             }
         }
-        if let Some(submit_label) = label.name.strip_prefix("Submit:") {
-            if assignment.is_some() {
+        if let Some(label) = label.name.strip_prefix("Submit:") {
+            if submit_label.is_some() {
                 return Err(Error::UserFacing(format!(
                     "Failed to parse issue {} - duplicate submit labels",
                     html_url
                 )));
             }
-            match submit_label {
-                "None" => {
-                    assignment = Some(None);
-                }
-                "PR" => {
-                    assignment = Some(Some(Assignment::ExpectedPullRequest {
-                        title: title.clone(),
-                    }));
-                }
-                "Issue" => {
-                    // TODO: Handle these.
-                    assignment = Some(None);
-                }
-                other => {
-                    return Err(Error::UserFacing(format!(
-                        "Failed to parse issue {} - submit label wasn't recognised: {}",
-                        html_url, other
-                    )));
-                }
-            }
+            submit_label = Some(label);
         }
     }
+
     let sprint = sprint.ok_or_else(|| {
         Error::UserFacing(format!(
             "Failed to parse issue {} - no sprint label.\n\nIf this issue was made my a curriculum team member it should be given a sprint label.\nIf this issue was created by a trainee for step submission, it should probably be closed (and they should create the issue in their fork).",
             html_url
         ))
     })?;
-    // TODO
-    // let assignment = assignment.ok_or_else(|| Error::UserFacing(format!("Failed to parse issue {} - no submit label", html_url)))?;
-    let assignment = assignment.unwrap_or(None);
+
+    let submit_label = match submit_label {
+        Some(submit_label) => submit_label,
+        // TODO: For now we treat a missing Submit label as an issue to ignore.
+        // When all issues have Submit labels, we should error if they're missing.
+        None => {
+            return Ok(Some((sprint, None)));
+        }
+    };
+
+    let assignment = match submit_label {
+        "None" => None,
+        "PR" => Some(Assignment::ExpectedPullRequest {
+            title: title.clone(),
+        }),
+        "Issue" => {
+            // TODO: Handle these.
+            None
+        }
+        other => {
+            return Err(Error::UserFacing(format!(
+                "Failed to parse issue {} - submit label wasn't recognised: {}",
+                html_url, other
+            )));
+        }
+    };
+
     Ok(Some((sprint, assignment)))
 }
 
