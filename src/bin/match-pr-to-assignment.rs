@@ -12,21 +12,22 @@ use trainee_tracker::{
 
 #[tokio::main]
 async fn main() {
-    let args: Vec<_> = std::env::args().collect();
-    let (github_token, pr_link) = match args.as_slice() {
-        [_, github_token, pr_link] => (github_token.clone(), pr_link.clone()),
-        _ => {
-            eprintln!("Expected two args - github token and PR link");
-            exit(1);
-        }
+    let Ok([github_token, pr_link]) = <[_; 2]>::try_from(std::env::args().collect::<Vec<_>>())
+    else {
+        eprintln!("Expected two args - github token and PR link");
+        exit(1);
     };
 
     let octocrab = octocrab_for_token(github_token.to_owned()).expect("Failed to get octocrab");
 
-    let pr_link_parts = pr_link.split("/").collect::<Vec<_>>();
-    let org_name = pr_link_parts[3].to_owned();
-    let module_name = pr_link_parts[4].to_owned();
-    let pr_number: u64 = pr_link_parts[6].parse().expect("PR number not a number");
+    let Ok([_https, _scheme, _githubdotcom, org_name, module_name, pr_number_str]) =
+        <[_; 6]>::try_from(pr_link.split('/').collect::<Vec<_>>())
+    else {
+        panic!("Couldn't parse GitHub PR link {}", pr_link);
+    };
+    let pr_number: u64 = pr_number_str
+        .parse()
+        .expect("Couldn't parse PR number as a number");
 
     let regions = [
         "London",
@@ -76,14 +77,14 @@ async fn main() {
         .filter(|pr| pr.author == pr_in_question.author)
         .collect();
     let matched = match_prs_to_assignments(
-        &course.modules[&module_name],
+        &course.modules[&module_name.to_owned()],
         user_prs,
         Vec::new(),
         &Region("London".to_owned()),
     )
     .expect("Failed to match PRs to assignments");
 
-    for (sprint_index, (sprint, sprint_with_submissions)) in course.modules[&module_name]
+    for (sprint_index, (sprint, sprint_with_submissions)) in course.modules[&module_name.to_owned()]
         .sprints
         .iter()
         .zip(matched.sprints.iter())

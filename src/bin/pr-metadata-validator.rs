@@ -18,13 +18,9 @@ const ARBITRARY_REGION: Region = Region(String::new());
 
 #[tokio::main]
 async fn main() {
-    let args: Vec<_> = std::env::args().collect();
-    let pr_url = match args.as_slice() {
-        [_argv0, pr_url] => pr_url,
-        _ => {
-            eprintln!("Expected one arg - PR URL");
-            exit(1);
-        }
+    let Ok([_argv0, pr_url]) = <[_; 2]>::try_from(std::env::args().collect::<Vec<_>>()) else {
+        eprintln!("Expected one arg - PR URL");
+        exit(1);
     };
     let pr_parts: Vec<_> = pr_url.split("/").collect();
     let (github_org_name, module_name, pr_number) = match pr_parts.as_slice() {
