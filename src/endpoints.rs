@@ -172,7 +172,7 @@ pub async fn course_prs(
         let octocrab = octocrab.clone();
         let github_org = &server_state.config.github_org;
         futures.push(async move {
-            let prs = get_prs(&octocrab, &github_org, &module, true).await?;
+            let prs = get_prs(&octocrab, github_org, &module, true).await?;
             fill_in_reviewers(octocrab.clone(), github_org.to_owned(), prs).await
         });
     }
