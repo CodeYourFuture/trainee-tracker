@@ -19,6 +19,7 @@ pub struct Pr {
     pub url: String,
     pub title: String,
     pub author: GithubLogin,
+    pub body: String,
     pub state: PrState,
     pub updated_at: DateTime<chrono::Utc>,
     pub is_closed: bool,
@@ -96,6 +97,7 @@ pub async fn get_prs(
                  updated_at,
                  title,
                  state,
+                 body,
                  ..
              }| {
                 // If a user is deleted from GitHub, their User will be None - ignore PRs from deleted users.
@@ -114,6 +116,8 @@ pub async fn get_prs(
                 let updated_at = updated_at?;
                 let url = html_url?.to_string();
                 let title = title?;
+                let body = body.unwrap_or_default();
+
                 Some(Pr {
                     number,
                     url,
@@ -122,6 +126,7 @@ pub async fn get_prs(
                     updated_at,
                     repo_name,
                     title,
+                    body,
                     is_closed,
                 })
             },

@@ -77,6 +77,15 @@ async fn main() {
                 .expect("Failed to create comment with validation error");
             exit(2);
         }
+        ValidationResult::BodyTemplateNotFilledOut => {
+            eprintln!("Validation error: Template not filled out");
+            octocrab
+                .issues(github_org_name, module_name.clone())
+                .create_comment(pr_number, BODY_TEMPLATE_NOT_FILLED_IN_COMMENT)
+                .await
+                .expect("Failed to create comment with validation error");
+            exit(2);
+        }
         ValidationResult::BadTitleFormat { reason } => {
             eprintln!("Validation error: Bad title: {}", reason);
             octocrab
@@ -104,6 +113,10 @@ Please check its title is in the correct format, and that you only have one PR p
 
 If this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed)."#;
 
+const BODY_TEMPLATE_NOT_FILLED_IN_COMMENT: &str = r#"Your PR description contained template fields which weren't filled in.
+
+Check you've ticked everything in the self checklist, and that any sections which prompt you to fill in an answer are either filled in or removed."#;
+
 const BAD_TITLE_COMMENT_PREFIX: &str = r#"Your PR's title isn't in the expected format.
 
 Please check the expected title format, and update yours to match.
@@ -116,6 +129,7 @@ Please check the expected title format, and make sure your region is in the corr
 
 enum ValidationResult {
     Ok,
+    BodyTemplateNotFilledOut,
     CouldNotMatch,
     BadTitleFormat { reason: String },
     UnknownRegion,
@@ -188,6 +202,15 @@ async fn validate_pr(
         return Ok(ValidationResult::BadTitleFormat {
             reason: "PR title should not all be in uppercase".to_owned(),
         });
+    }
+
+    if pr_in_question.body.contains("Briefly explain your PR.")
+        || pr_in_question
+            .body
+            .contains("Ask any questions you have for your reviewer.")
+        || pr_in_question.body.contains("- [ ]")
+    {
+        return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
     Ok(ValidationResult::Ok)
