@@ -126,6 +126,126 @@
               }
             ]
           }
+        },
+        "itp-batch-2025-sep": {
+          "start": "2025-09-01",
+          "end": "2025-12-31",
+          "sprints": {
+            "Module-Welcome": [
+              {
+                "London": "2025-09-06",
+                "West Midlands": "2025-09-06",
+                "North West": "2025-09-06",
+                "Sheffield": "2025-09-06",
+                "Glasgow": "2025-09-06",
+                "South Africa": "2025-09-06"
+              }
+            ],
+            "Module-Onboarding": [
+              {
+                "London": "2025-09-13",
+                "West Midlands": "2025-09-13",
+                "North West": "2025-09-13",
+                "Sheffield": "2025-09-13",
+                "Glasgow": "2025-09-13",
+                "South Africa": "2025-09-13"
+              },
+              {
+                "London": "2025-09-20",
+                "West Midlands": "2025-09-20",
+                "North West": "2025-09-20",
+                "Sheffield": "2025-09-20",
+                "Glasgow": "2025-09-20",
+                "South Africa": "2025-09-20"
+              },
+              {
+                "London": "2025-09-27",
+                "West Midlands": "2025-09-27",
+                "North West": "2025-09-27",
+                "Sheffield": "2025-09-27",
+                "Glasgow": "2025-09-27",
+                "South Africa": "2025-09-27"
+              }
+            ],
+            "Module-Structuring-And-Testing-Data": [
+              {
+                "London": "2025-10-04",
+                "West Midlands": "2025-10-04",
+                "North West": "2025-10-04",
+                "Sheffield": "2025-10-04",
+                "Glasgow": "2025-10-04",
+                "South Africa": "2025-10-04"
+              },
+              {
+                "London": "2025-10-11",
+                "West Midlands": "2025-10-11",
+                "North West": "2025-10-11",
+                "Sheffield": "2025-10-11",
+                "Glasgow": "2025-10-11",
+                "South Africa": "2025-10-11"
+              },
+              {
+                "London": "2025-10-18",
+                "West Midlands": "2025-10-18",
+                "North West": "2025-10-18",
+                "Sheffield": "2025-10-18",
+                "Glasgow": "2025-10-18",
+                "South Africa": "2025-10-18"
+              }
+            ],
+            "Module-Data-Groups": [
+              {
+                "London": "2025-10-25",
+                "West Midlands": "2025-10-25",
+                "North West": "2025-10-25",
+                "Sheffield": "2025-10-25",
+                "Glasgow": "2025-10-25",
+                "South Africa": "2025-10-25"
+              },
+              {
+                "London": "2025-11-01",
+                "West Midlands": "2025-11-01",
+                "North West": "2025-11-01",
+                "Sheffield": "2025-11-01",
+                "Glasgow": "2025-11-01",
+                "South Africa": "2025-11-01"
+              },
+              {
+                "London": "2025-11-08",
+                "West Midlands": "2025-11-08",
+                "North West": "2025-11-08",
+                "Sheffield": "2025-11-08",
+                "Glasgow": "2025-11-08",
+                "South Africa": "2025-11-08"
+              }
+            ],
+            "Module-Data-Flows": [
+              {
+                "London": "2025-11-15",
+                "West Midlands": "2025-11-15",
+                "North West": "2025-11-15",
+                "Sheffield": "2025-11-15",
+                "Glasgow": "2025-11-15",
+                "South Africa": "2025-11-15"
+              },
+              {
+                "London": "2025-11-22",
+                "West Midlands": "2025-11-22",
+                "North West": "2025-11-22",
+                "Sheffield": "2025-11-22",
+                "Glasgow": "2025-11-22",
+                "South Africa": "2025-11-22"
+              },
+              {
+                "London": "2025-11-29",
+                "West Midlands": "2025-11-29",
+                "North West": "2025-11-29",
+                "Sheffield": "2025-11-29",
+                "Glasgow": "2025-11-29",
+                "South Africa": "2025-11-29"
+              }
+            ]
+          }
         }
       }
     },
