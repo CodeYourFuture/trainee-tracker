@@ -456,7 +456,7 @@ impl TraineeWithSubmissions {
                 }
             }
         }
-        10000 * numerator / denominator
+        u64::checked_div(10000 * numerator, denominator).unwrap_or(0)
     }
 }
 
