@@ -242,12 +242,6 @@
                 "West Midlands": "2025-08-16"
               },
               {
-                "London": "2025-08-30",
-                "Glasgow": "2025-08-30",
-                "South Africa": "2025-08-30",
-                "West Midlands": "2025-08-30"
-              },
-              {
                 "London": "2025-09-06",
                 "Glasgow": "2025-09-06",
                 "South Africa": "2025-09-06",
@@ -258,9 +252,7 @@
                 "Glasgow": "2025-09-13",
                 "South Africa": "2025-09-13",
                 "West Midlands": "2025-09-13"
-              }
-            ],
-            "Module-Legacy-Code": [
+              },
               {
                 "London": "2025-09-20",
                 "Glasgow": "2025-09-20",
@@ -268,18 +260,26 @@
                 "West Midlands": "2025-09-20"
               }
             ],
-            "Module-Complexity": [
+            "Module-Legacy-Code": [
               {
                 "London": "2025-09-27",
                 "Glasgow": "2025-09-27",
                 "South Africa": "2025-09-27",
                 "West Midlands": "2025-09-27"
-              },
+              }
+            ],
+            "Module-Complexity": [
               {
                 "London": "2025-10-04",
                 "Glasgow": "2025-10-04",
                 "South Africa": "2025-10-04",
                 "West Midlands": "2025-10-04"
+              },
+              {
+                "London": "2025-10-11",
+                "Glasgow": "2025-10-11",
+                "South Africa": "2025-10-11",
+                "West Midlands": "2025-10-11"
               }
             ]
           }
