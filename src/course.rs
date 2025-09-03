@@ -227,6 +227,10 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
             html_url: html_url.clone(),
             optionality,
         }),
+        "Codility" => {
+            // TODO: Handle these.
+            None
+        }
         "Issue" => {
             // TODO: Handle these.
             None
