@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::collections::BTreeMap;
 
 use anyhow::Context;
 use email_address::EmailAddress;
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sheets::types::Sheet;
 
 use crate::{
-    newtypes::{GithubLogin, Region},
+    newtypes::{new_case_insensitive_email_address, GithubLogin, Region},
     sheets::{cell_string, SheetsClient},
     Error,
 };
@@ -96,7 +96,7 @@ fn trainees_from_sheet(
                         cell_string(&cells[2]).context("Failed to read trainee region")?,
                     ),
                     github_login,
-                    email: EmailAddress::from_str(&email)
+                    email: new_case_insensitive_email_address(&email)
                         .with_context(|| format!("Failed to parse trainee email {}", email))?,
                 },
             );
