@@ -1,7 +1,12 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use case_insensitive_string::CaseInsensitiveString;
+use email_address::EmailAddress;
 use serde::{Deserialize, Serialize};
+
+pub fn new_case_insensitive_email_address(s: &str) -> Result<EmailAddress, email_address::Error> {
+    EmailAddress::from_str(&s.to_ascii_lowercase())
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]

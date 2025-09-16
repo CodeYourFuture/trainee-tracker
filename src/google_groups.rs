@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    str::FromStr,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Context;
 use email_address::EmailAddress;
@@ -15,6 +12,7 @@ use tower_sessions::Session;
 
 use crate::{
     google_auth::{make_redirect_uri, redirect_endpoint, GoogleScope},
+    newtypes::new_case_insensitive_email_address,
     Error, ServerState,
 };
 
@@ -98,13 +96,13 @@ pub(crate) async fn get_groups(client: &Client) -> Result<GoogleGroups, Error> {
             let members =
                 error_for_status(members.context("Failed to list Google group members")?)?;
             Ok(GoogleGroup {
-                email: EmailAddress::from_str(&group.email).with_context(|| {
+                email: new_case_insensitive_email_address(&group.email).with_context(|| {
                     format!("Failed to parse group email address {}", group.email)
                 })?,
                 members: members
                     .into_iter()
                     .map(|Member { email, .. }| {
-                        EmailAddress::from_str(&email).with_context(|| {
+                        new_case_insensitive_email_address(&email).with_context(|| {
                             format!(
                                 "Failed to parse group member email address {} (member of {})",
                                 email, group.email

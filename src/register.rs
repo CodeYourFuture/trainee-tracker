@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, Utc};
 use email_address::EmailAddress;
@@ -8,6 +6,7 @@ use sheets::types::{CellData, GridData};
 use tracing::warn;
 
 use crate::{
+    newtypes::new_case_insensitive_email_address,
     sheets::{cell_string, SheetsClient},
     Error,
 };
@@ -204,7 +203,9 @@ fn read_row(
         &cell_string(&cells[5]).context("Couldn't get sprint value from column 5")?,
     )?;
     let name = cell_string(&cells[0]).context("Failed to read name")?;
-    let email = EmailAddress::from_str(&cell_string(&cells[1]).context("Failed to read email")?)?;
+    let email = new_case_insensitive_email_address(
+        &cell_string(&cells[1]).context("Failed to read email")?,
+    )?;
     let timestamp =
         DateTime::parse_from_rfc3339(&cell_string(&cells[2]).context("Failed to read timestamp")?)
             .context("Failed to parse timestamp")?
