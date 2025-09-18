@@ -11,12 +11,7 @@ use serde::Serialize;
 use tower_sessions::Session;
 
 use crate::{
-    github_accounts::get_trainees,
-    newtypes::GithubLogin,
-    octocrab::{all_pages, octocrab},
-    prs::{fill_in_reviewers, get_prs, PrWithReviews},
-    sheets::sheets_client,
-    Error, ServerState,
+    course, github_accounts::get_trainees, newtypes::GithubLogin, octocrab::{all_pages, octocrab}, prs::{fill_in_reviewers, get_prs, PrWithReviews}, register::get_register, sheets::sheets_client, Error, ServerState
 };
 
 pub async fn health_check() -> impl IntoResponse {
@@ -206,4 +201,29 @@ pub async fn get_region(
             .get(&GithubLogin::from(github_login))
             .map(|trainee| trainee.region.clone()),
     }))
+}
+
+pub async fn fecth_attendance( session: Session,
+    State(server_state): State<ServerState>,
+    OriginalUri(original_uri): OriginalUri,) -> Result<String, Error> {
+    let course = "itp".to_string();
+    let batch_github_slug = "itp-batch-2025-sep".to_string();
+    let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
+    let github_org = &server_state.config.github_org;
+    let octocrab = octocrab(&session, &server_state, original_uri).await?;
+    let course_schedule = server_state
+        .config
+        .get_course_schedule_with_register_sheet_id(course.clone(), &batch_github_slug)
+        .ok_or_else(|| Error::Fatal(anyhow::anyhow!("Course not found: {course}")))?;
+    let course = course_schedule
+        .with_assignments(&octocrab, github_org)
+        .await?;
+    let register_info = get_register(
+        sheets_client.clone(),
+        course.register_sheet_id.clone(),
+        course.start_date,
+        course.end_date,
+    )
+    .await?;
+    Ok(format!("Register info: {:#?}", register_info))
 }

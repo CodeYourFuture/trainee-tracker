@@ -100,6 +100,10 @@ async fn main() {
             "/groups/slack.csv",
             get(trainee_tracker::frontend::list_slack_groups_csv),
         )
+        .route(
+            "/api/attendance",
+            get(trainee_tracker::endpoints::fecth_attendance),
+        )
         .layer(session_layer)
         .with_state(server_state);
 
