@@ -203,27 +203,62 @@ pub async fn get_region(
     }))
 }
 
+#[derive(Serialize)]
+pub struct AttendanceEntry {
+    date: String,
+    trainee_email: String,
+    time: String
+}
+#[derive(Serialize)]
+pub struct Attendance {
+    courses: IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<String, Vec<AttendanceEntry>>>>>
+}
+
 pub async fn fecth_attendance( session: Session,
     State(server_state): State<ServerState>,
-    OriginalUri(original_uri): OriginalUri,) -> Result<String, Error> {
-    let course = "itp".to_string();
-    let batch_github_slug = "itp-batch-2025-sep".to_string();
+    OriginalUri(original_uri): OriginalUri,) -> Result<Json<Attendance>, Error> {
+    let all_courses = &server_state.config.courses;
     let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
     let github_org = &server_state.config.github_org;
     let octocrab = octocrab(&session, &server_state, original_uri).await?;
-    let course_schedule = server_state
-        .config
-        .get_course_schedule_with_register_sheet_id(course.clone(), &batch_github_slug)
-        .ok_or_else(|| Error::Fatal(anyhow::anyhow!("Course not found: {course}")))?;
-    let course = course_schedule
-        .with_assignments(&octocrab, github_org)
-        .await?;
-    let register_info = get_register(
-        sheets_client.clone(),
-        course.register_sheet_id.clone(),
-        course.start_date,
-        course.end_date,
-    )
-    .await?;
-    Ok(format!("Register info: {:#?}", register_info))
+    let mut courses: IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<String, Vec<AttendanceEntry>>>>> = IndexMap::new();
+    for (course_name, course_info) in all_courses {
+        let mut course_batches: IndexMap<String, IndexMap<String, IndexMap<String, Vec<AttendanceEntry>>>> = IndexMap::new();
+        for batch_name in course_info.batches.keys() {
+            let course_schedule = server_state
+                .config
+                .get_course_schedule_with_register_sheet_id(course_name.clone(), &batch_name)
+                .ok_or_else(|| Error::Fatal(anyhow::anyhow!("Course not found: {course_name}")))?;
+            let mut modules: IndexMap<String, IndexMap<String, Vec<AttendanceEntry>>> = IndexMap::new();
+            let course = course_schedule
+                .with_assignments(&octocrab, github_org)
+                .await?;
+            let register_info = get_register(
+                sheets_client.clone(),
+                course.register_sheet_id.clone(),
+                course.start_date,
+                course.end_date,
+                )
+                .await?;
+
+            for (module_name, sprint_info) in &register_info.modules {
+                let mut sprints: IndexMap<String, Vec<AttendanceEntry>> = IndexMap::new();
+                for (sprint_number, sprint_info) in sprint_info.attendance.iter().enumerate() {
+                    let mut entries: Vec<AttendanceEntry> = Vec::new();
+                    for (_index, entry) in sprint_info {
+                        entries.push(AttendanceEntry { date: entry.timestamp.date_naive().to_string(),
+                        trainee_email: entry.email.to_string(),
+                        time: entry.timestamp.time().to_string(), })
+                    }
+                    sprints.insert(sprint_number.to_string(), entries);
+                }
+                modules.insert(module_name.clone(), sprints);
+            }
+            course_batches.insert(batch_name.clone(),  modules );
+             }        
+        courses.insert(course_name.clone(),  course_batches );     
+    }
+        
+    Ok(Json(Attendance { courses }))
+
 }
