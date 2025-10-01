@@ -4,6 +4,7 @@ use anyhow::Context;
 use chrono::{DateTime, NaiveDate, Utc};
 use email_address::EmailAddress;
 use indexmap::IndexMap;
+use serde::Serialize;
 use sheets::types::{CellData, GridData};
 use tracing::warn;
 
@@ -24,7 +25,7 @@ pub struct ModuleAttendance {
     pub attendance: Vec<IndexMap<EmailAddress, Attendance>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Attendance {
     pub name: String,
     pub email: EmailAddress,

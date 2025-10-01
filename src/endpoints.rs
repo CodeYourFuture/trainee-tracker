@@ -11,7 +11,14 @@ use serde::Serialize;
 use tower_sessions::Session;
 
 use crate::{
-    course, github_accounts::get_trainees, newtypes::GithubLogin, octocrab::{all_pages, octocrab}, prs::{fill_in_reviewers, get_prs, PrWithReviews}, register::get_register, sheets::sheets_client, Error, ServerState
+    course,
+    github_accounts::get_trainees,
+    newtypes::GithubLogin,
+    octocrab::{all_pages, octocrab},
+    prs::{fill_in_reviewers, get_prs, PrWithReviews},
+    register::{get_register, Attendance},
+    sheets::sheets_client,
+    Error, ServerState,
 };
 
 pub async fn health_check() -> impl IntoResponse {
@@ -204,32 +211,35 @@ pub async fn get_region(
 }
 
 #[derive(Serialize)]
-pub struct AttendanceEntry {
-    date: String,
-    trainee_email: String,
-    time: String
-}
-#[derive(Serialize)]
-pub struct Attendance {
-    courses: IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<String, Vec<AttendanceEntry>>>>>
+pub struct AttendanceResponse {
+    courses:
+        IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<String, Vec<Attendance>>>>>,
 }
 
-pub async fn fecth_attendance( session: Session,
+pub async fn fecth_attendance(
+    session: Session,
     State(server_state): State<ServerState>,
-    OriginalUri(original_uri): OriginalUri,) -> Result<Json<Attendance>, Error> {
+    OriginalUri(original_uri): OriginalUri,
+) -> Result<Json<AttendanceResponse>, Error> {
     let all_courses = &server_state.config.courses;
     let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
     let github_org = &server_state.config.github_org;
     let octocrab = octocrab(&session, &server_state, original_uri).await?;
-    let mut courses: IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<String, Vec<AttendanceEntry>>>>> = IndexMap::new();
+    let mut courses: IndexMap<
+        String,
+        IndexMap<String, IndexMap<String, IndexMap<String, Vec<Attendance>>>>,
+    > = IndexMap::new();
     for (course_name, course_info) in all_courses {
-        let mut course_batches: IndexMap<String, IndexMap<String, IndexMap<String, Vec<AttendanceEntry>>>> = IndexMap::new();
+        let mut course_batches: IndexMap<
+            String,
+            IndexMap<String, IndexMap<String, Vec<Attendance>>>,
+        > = IndexMap::new();
         for batch_name in course_info.batches.keys() {
             let course_schedule = server_state
                 .config
                 .get_course_schedule_with_register_sheet_id(course_name.clone(), &batch_name)
                 .ok_or_else(|| Error::Fatal(anyhow::anyhow!("Course not found: {course_name}")))?;
-            let mut modules: IndexMap<String, IndexMap<String, Vec<AttendanceEntry>>> = IndexMap::new();
+            let mut modules: IndexMap<String, IndexMap<String, Vec<Attendance>>> = IndexMap::new();
             let course = course_schedule
                 .with_assignments(&octocrab, github_org)
                 .await?;
@@ -238,27 +248,24 @@ pub async fn fecth_attendance( session: Session,
                 course.register_sheet_id.clone(),
                 course.start_date,
                 course.end_date,
-                )
-                .await?;
+            )
+            .await?;
 
-            for (module_name, sprint_info) in &register_info.modules {
-                let mut sprints: IndexMap<String, Vec<AttendanceEntry>> = IndexMap::new();
-                for (sprint_number, sprint_info) in sprint_info.attendance.iter().enumerate() {
-                    let mut entries: Vec<AttendanceEntry> = Vec::new();
+            for (module_name, sprint_info) in register_info.modules {
+                let mut sprints: IndexMap<String, Vec<Attendance>> = IndexMap::new();
+                for (sprint_number, sprint_info) in sprint_info.attendance.into_iter().enumerate() {
+                    let mut entries: Vec<Attendance> = Vec::new();
                     for (_index, entry) in sprint_info {
-                        entries.push(AttendanceEntry { date: entry.timestamp.date_naive().to_string(),
-                        trainee_email: entry.email.to_string(),
-                        time: entry.timestamp.time().to_string(), })
+                        entries.push(entry);
                     }
-                    sprints.insert(sprint_number.to_string(), entries);
+                    sprints.insert(format!("Sprint {}", sprint_number + 1), entries);
                 }
                 modules.insert(module_name.clone(), sprints);
             }
-            course_batches.insert(batch_name.clone(),  modules );
-             }        
-        courses.insert(course_name.clone(),  course_batches );     
+            course_batches.insert(batch_name.clone(), modules);
+        }
+        courses.insert(course_name.clone(), course_batches);
     }
-        
-    Ok(Json(Attendance { courses }))
 
+    Ok(Json(AttendanceResponse { courses }))
 }
