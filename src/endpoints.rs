@@ -11,7 +11,6 @@ use serde::Serialize;
 use tower_sessions::Session;
 
 use crate::{
-    course,
     github_accounts::get_trainees,
     newtypes::GithubLogin,
     octocrab::{all_pages, octocrab},
