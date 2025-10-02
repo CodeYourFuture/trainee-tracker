@@ -96,6 +96,11 @@ impl SheetsClient {
                     .await?,
                 ))
             }
+            Err(err @ ::sheets::ClientError::HttpError { status, .. })
+                if status.as_u16() == 403 =>
+            {
+                Err(Error::PotentiallyIgnorablePermissions(err.into()))
+            }
             Err(err) => Err(Error::Fatal(err.into())),
         }
     }
