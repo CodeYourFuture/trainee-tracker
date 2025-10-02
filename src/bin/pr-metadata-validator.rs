@@ -162,6 +162,11 @@ async fn validate_pr(
             )
         })?
         .clone();
+
+    if pr_in_question.labels.contains("NotCoursework") {
+        return Ok(ValidationResult::Ok);
+    }
+
     let user_prs: Vec<_> = module_prs
         .into_iter()
         .filter(|pr| pr.author == pr_in_question.author)

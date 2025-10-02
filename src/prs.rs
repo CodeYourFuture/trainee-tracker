@@ -4,7 +4,7 @@ use anyhow::Context;
 use chrono::{DateTime, TimeDelta};
 use futures::future::join_all;
 use octocrab::models::pulls::{Comment, PullRequest, Review as OctoReview};
-use octocrab::models::{Author, IssueState, Label};
+use octocrab::models::{Author, IssueState};
 use octocrab::params::State;
 use octocrab::Octocrab;
 use serde::Serialize;
@@ -23,6 +23,7 @@ pub struct Pr {
     pub state: PrState,
     pub updated_at: DateTime<chrono::Utc>,
     pub is_closed: bool,
+    pub labels: BTreeSet<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -33,20 +34,14 @@ pub enum PrState {
     Unknown,
 }
 
-impl From<Option<Vec<Label>>> for PrState {
-    fn from(labels: Option<Vec<Label>>) -> Self {
-        if let Some(labels) = labels {
-            let label_names: BTreeSet<_> =
-                labels.into_iter().map(|Label { name, .. }| name).collect();
-            if label_names.contains("Needs Review") {
-                PrState::NeedsReview
-            } else if label_names.contains("Complete") {
-                PrState::Complete
-            } else if label_names.contains("Reviewed") {
-                PrState::Reviewed
-            } else {
-                PrState::Unknown
-            }
+impl From<&BTreeSet<String>> for PrState {
+    fn from(labels: &BTreeSet<String>) -> Self {
+        if labels.contains("Needs Review") {
+            PrState::NeedsReview
+        } else if labels.contains("Complete") {
+            PrState::Complete
+        } else if labels.contains("Reviewed") {
+            PrState::Reviewed
         } else {
             PrState::Unknown
         }
@@ -102,7 +97,14 @@ pub async fn get_prs(
              }| {
                 // If a user is deleted from GitHub, their User will be None - ignore PRs from deleted users.
                 let author = GithubLogin::from(user?.login);
-                let pr_state = PrState::from(labels);
+
+                let labels = labels
+                    .into_iter()
+                    .flatten()
+                    .map(|label| label.name)
+                    .collect();
+
+                let pr_state = PrState::from(&labels);
 
                 let is_closed = state.unwrap_or(IssueState::Open) == IssueState::Closed;
                 if is_closed && pr_state != PrState::Complete {
@@ -128,6 +130,7 @@ pub async fn get_prs(
                     title,
                     body,
                     is_closed,
+                    labels,
                 })
             },
         )
