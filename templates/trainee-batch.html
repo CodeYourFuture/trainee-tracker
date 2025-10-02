@@ -42,6 +42,15 @@
             td.pr-unknown {
                 background-color: grey;
             }
+            td.mentoring-recent {
+                background-color: var(--green);
+            }
+            td.mentoring-stale {
+                background-color: var(--orange);
+            }
+            td.mentoring-unknown {
+                background-color: grey;
+            }
             .trainee-on-track {
                 background-color: var(--green);
             }
@@ -89,6 +98,7 @@
                 <tr>
                     <th>GitHub</th>
                     <th>Region</th>
+                    {% if batch.has_mentoring_records() %}<th>Last check-in</th>{% endif %}
                     {% for (module_name, module) in course.modules %}
                         <th colspan="{{ module.assignment_count() }}">{{module_name}}</th>
                     {% endfor %}
@@ -96,6 +106,7 @@
                 <tr>
                     <th></th>
                     <th></th>
+                    {% if batch.has_mentoring_records() %}<th></th>{% endif %}
                     {% for (module_name, module) in course.modules %}
                         {% for (sprint_number, sprint) in module.sprints.iter().enumerate() %}
                             <th colspan="{{ sprint.assignment_count() }}">Sprint {{ sprint_number + 1 }}</th>
@@ -105,6 +116,7 @@
                 <tr>
                     <th></th>
                     <th></th>
+                    {% if batch.has_mentoring_records() %}<th></th>{% endif %}
                     {% for (module_name, module) in course.modules %}
                         {% for sprint in module.sprints %}
                             {% for assignment in sprint.assignments %}
@@ -119,6 +131,18 @@
                     <tr>
                         <th class="{{ css_classes_for_trainee_status(&trainee.status()) }}">{{ trainee.trainee.name }} - <a href="https://github.com/{{trainee.trainee.github_login}}">@{{ trainee.trainee.github_login }}</a> - {{ trainee.trainee.email }} - {{ trainee.progress_score() / 100 }}%</th>
                         <td>{{ trainee.trainee.region }}</td>
+                        {% if batch.has_mentoring_records() %}
+                            {% match trainee.mentoring_record %}
+                                {% when Some(mentoring_record) %}
+                                    {% if mentoring_record.is_recent() %}
+                                        <td class="mentoring-recent">{{ mentoring_record.last_date }}</td>
+                                    {% else %}
+                                        <td class="mentoring-stale">{{ mentoring_record.last_date }}</td>
+                                    {% endif %}
+                                {% when None %}
+                                    <td class="mentoring-unknown">Unknown</td>
+                            {% endmatch %}
+                        {% endif %}
                         {% for (module_name, module) in trainee.modules %}
                             {% for sprint in module.sprints %}
                                 {% for submission in sprint.submissions %}

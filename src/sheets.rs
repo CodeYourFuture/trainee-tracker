@@ -26,6 +26,12 @@ pub(crate) fn cell_bool(cell: &CellData) -> Result<bool, anyhow::Error> {
     }
 }
 
+pub(crate) fn cell_date(cell: &CellData) -> Result<chrono::NaiveDate, anyhow::Error> {
+    let date_string = &cell.formatted_value;
+    chrono::NaiveDate::parse_from_str(date_string, "%Y-%m-%d")
+        .with_context(|| format!("Failed to parse {} as a date", date_string))
+}
+
 pub(crate) async fn sheets_client(
     session: &Session,
     server_state: ServerState,

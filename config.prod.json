@@ -9,6 +9,7 @@
   "google_apis_client_secret": "$CYF_TRAINEE_TRACKER_GOOGLE_APIS_CLIENT_SECRET",
   "github_email_mapping_sheet_id": "1ahDEnO8odD9oLtO_EBcvcmEaF0qsX-I4iLCIY0XLjt0",
   "reviewer_staff_info_sheet_id": "1CKDrXtx5lkgfZ8E2mjvsDup2K8UyBsq99CIV0qOxrP0",
+  "mentoring_records_sheet_id": "1PYOb__p0nT0vPWPtbbLT0KXGv53xpkNLSCaPFAfRGrk",
 
   "slack_client_id": "85239491699.9205264014663",
   "slack_client_secret": "$CYF_TRAINEE_TRACKER_SLACK_CLIENT_SECRET",

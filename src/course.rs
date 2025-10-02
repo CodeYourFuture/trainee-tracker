@@ -7,6 +7,7 @@ use std::{
 use crate::{
     config::CourseScheduleWithRegisterSheetId,
     github_accounts::{get_trainees, Trainee},
+    mentoring::{get_mentoring_records, MentoringRecord},
     newtypes::{GithubLogin, Region},
     octocrab::all_pages,
     prs::{get_prs, Pr, PrState},
@@ -376,11 +377,18 @@ impl Batch {
             .map(|(region, _count)| region)
             .collect()
     }
+
+    pub fn has_mentoring_records(&self) -> bool {
+        self.trainees
+            .iter()
+            .any(|trainee| trainee.mentoring_record.is_some())
+    }
 }
 
 #[derive(Debug)]
 pub struct TraineeWithSubmissions {
     pub trainee: Trainee,
+    pub mentoring_record: Option<MentoringRecord>,
     pub modules: IndexMap<String, ModuleWithSubmissions>,
 }
 
@@ -651,6 +659,7 @@ pub async fn get_batch_with_submissions(
     octocrab: &Octocrab,
     sheets_client: SheetsClient,
     github_email_mapping_sheet_id: &str,
+    mentoring_records_sheet_id: &str,
     github_org: &str,
     batch_github_slug: &str,
     course: &Course,
@@ -663,6 +672,9 @@ pub async fn get_batch_with_submissions(
         course.end_date,
     )
     .await?;
+
+    let mentoring_records =
+        get_mentoring_records(sheets_client.clone(), mentoring_records_sheet_id).await?;
 
     let batch_members = get_batch_members(
         octocrab,
@@ -734,6 +746,9 @@ pub async fn get_batch_with_submissions(
 
             modules.insert(module_name.clone(), module_with_submissions);
         }
+
+        let mentoring_record = mentoring_records.get(&trainee_name);
+
         let trainee = TraineeWithSubmissions {
             trainee: Trainee {
                 github_login,
@@ -744,6 +759,7 @@ pub async fn get_batch_with_submissions(
                 }),
                 region,
             },
+            mentoring_record,
             modules,
         };
         trainees.push(trainee);
