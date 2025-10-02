@@ -59,8 +59,18 @@ pub struct GoogleAuthState {
 
 #[derive(Debug)]
 pub enum Error {
+    /// An error with a message which should be displayed to an end user.
+    /// The error message should clearly explain to the user what has gone wrong, and what to do about it.
+    /// Make sure the error message does not leak any private or security-sensitive data.
     UserFacing(String),
+    /// An error which cannot be rectified by the user directly, or where we don't know if the error contains sensitive data.
+    /// Never display this directly to a user. It can be logged on the server side, but if you're going to show something to a user, instead use a UserFacing.
     Fatal(anyhow::Error),
+    /// An error message which was caused by a lack of permissions, and where the caller _may_ want to ignore the lack of data.
+    /// It is up to the caller to decide whether to treat this error as fatal, or whether to e.g. fall back to default data.
+    PotentiallyIgnorablePermissions(anyhow::Error),
+    /// An instruction that we should redirect the user to another page.
+    /// Not really an error as such. This tends to be returned by code which require auth to say "please authenticate via OAuth somewhere, and try again".
     Redirect(Uri),
 }
 
@@ -69,6 +79,9 @@ impl Error {
         match self {
             Self::UserFacing(message) => Self::UserFacing(message),
             Self::Fatal(err) => Self::Fatal(err.context(context)),
+            Self::PotentiallyIgnorablePermissions(err) => {
+                Self::PotentiallyIgnorablePermissions(err.context(context))
+            }
             Self::Redirect(redirect) => Self::Redirect(redirect),
         }
     }
@@ -77,6 +90,9 @@ impl Error {
         match self {
             Self::UserFacing(message) => Self::UserFacing(message),
             Self::Fatal(err) => Self::Fatal(err.context(f())),
+            Self::PotentiallyIgnorablePermissions(err) => {
+                Self::PotentiallyIgnorablePermissions(err.context(f()))
+            }
             Self::Redirect(redirect) => Self::Redirect(redirect),
         }
     }
@@ -85,7 +101,8 @@ impl Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         match self {
-            Error::Fatal(err) => {
+            // We handle PotentiallyIgnorablePermissions like a Fatal error because if it was ignorable, we assume some code would have handled it before we got to making a response.
+            Error::Fatal(err) | Error::PotentiallyIgnorablePermissions(err) => {
                 error!("Fatal error: {error:?}", error = err);
                 (StatusCode::INTERNAL_SERVER_ERROR, "An error occurred").into_response()
             }
@@ -113,7 +130,7 @@ impl IntoResponse for Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Fatal(err) => err.fmt(f),
+            Error::Fatal(err) | Error::PotentiallyIgnorablePermissions(err) => err.fmt(f),
             Error::UserFacing(message) => write!(f, "{}", message),
             Error::Redirect(_) => write!(f, "<redirect>"),
         }
