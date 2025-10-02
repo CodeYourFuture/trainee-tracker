@@ -1,4 +1,5 @@
 use axum::routing::get;
+use dotenv::dotenv;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use tracing::info;
 use tracing_subscriber::prelude::*;
@@ -25,6 +26,12 @@ async fn main() {
         .with(stderr_layer.with_filter(stderr_log_level))
         .try_init()
         .expect("Failed to configure logging");
+
+    if let Err(err) = dotenv() {
+        if !err.not_found() {
+            panic!("Error loading .env file: {}", err);
+        }
+    }
 
     let config_bytes = std::fs::read(&args[0]).expect("Failed to read config file");
     let config: Config =
