@@ -66,52 +66,31 @@ async fn main() {
     )
     .await
     .expect("Failed to validate PR");
-    match result {
-        ValidationResult::Ok => {}
-        ValidationResult::CouldNotMatch => {
-            eprintln!("Validation error: Could not match PR against assignment");
-            octocrab
-                .issues(github_org_name, module_name.clone())
-                .create_comment(pr_number, COULD_NOT_MATCH_COMMENT)
-                .await
-                .expect("Failed to create comment with validation error");
-            exit(2);
+    let message = match result {
+        ValidationResult::Ok => {
+            exit(0);
         }
-        ValidationResult::BodyTemplateNotFilledOut => {
-            eprintln!("Validation error: Template not filled out");
-            octocrab
-                .issues(github_org_name, module_name.clone())
-                .create_comment(pr_number, BODY_TEMPLATE_NOT_FILLED_IN_COMMENT)
-                .await
-                .expect("Failed to create comment with validation error");
-            exit(2);
-        }
+        ValidationResult::CouldNotMatch => COULD_NOT_MATCH_COMMENT,
+        ValidationResult::BodyTemplateNotFilledOut => BODY_TEMPLATE_NOT_FILLED_IN_COMMENT,
         ValidationResult::BadTitleFormat { reason } => {
-            eprintln!("Validation error: Bad title: {}", reason);
-            octocrab
-                .issues(github_org_name, module_name.clone())
-                .create_comment(pr_number, format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason))
-                .await
-                .expect("Failed to create comment with validation error");
-            exit(2);
+            &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
-        ValidationResult::UnknownRegion => {
-            eprintln!("Validation error: Could not find region in PR title");
-            octocrab
-                .issues(github_org_name, module_name.clone())
-                .create_comment(pr_number, UNKNOWN_REGION_COMMENT)
-                .await
-                .expect("Failed to create comment with validation error");
-            exit(2);
-        }
-    }
+        ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
+    };
+
+    let full_message = format!("{message}\n\nIf this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed).");
+    eprintln!("{}", full_message);
+    octocrab
+        .issues(github_org_name, module_name)
+        .create_comment(pr_number, full_message)
+        .await
+        .expect("Failed to create comment with validation error");
+    exit(2);
 }
 
 const COULD_NOT_MATCH_COMMENT: &str = r#"Your PR couldn't be matched to an assignment in this module.
 
-Please check its title is in the correct format, and that you only have one PR per assignment.
-
-If this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed)."#;
+Please check its title is in the correct format, and that you only have one PR per assignment."#;
 
 const BODY_TEMPLATE_NOT_FILLED_IN_COMMENT: &str = r#"Your PR description contained template fields which weren't filled in.
 
