@@ -10,9 +10,6 @@
             {% endfor %}
             <li>
                 <a href="/courses/{{ cwbm.course.name }}/reviewers">Reviewers</a>
-                {% if is_staff %}
-                (<a href="/courses/{{ cwbm.course.name }}/reviewers?staff=true">Staff view</a>)
-                {% endif %}
             </li>
         </ul>
         {% endfor %}
