@@ -6,9 +6,8 @@ use axum::{
     extract::{OriginalUri, Path, Query, State},
     response::{Html, IntoResponse, Response},
 };
-use futures::future::{join, join_all};
+use futures::future::join_all;
 use http::{header::CONTENT_TYPE, StatusCode, Uri};
-use octocrab::Octocrab;
 use serde::Deserialize;
 use tower_sessions::Session;
 
@@ -19,7 +18,7 @@ use crate::{
         Submission, TraineeStatus,
     },
     google_groups::{get_groups, groups_client, GoogleGroup},
-    octocrab::{all_pages, octocrab},
+    octocrab::octocrab,
     prs::{MaybeReviewerStaffOnlyDetails, PrState, ReviewerInfo},
     reviewer_staff_info::get_reviewer_staff_info,
     sheets::sheets_client,
@@ -43,10 +42,6 @@ pub async fn list_courses(
     .await
     .into_iter()
     .collect::<Result<Vec<_>, _>>()?;
-
-    let is_staff = is_staff(&octocrab, &server_state.config.github_org)
-        .await
-        .unwrap_or(false);
 
     let courses_with_batch_metadata = courses
         .keys()
@@ -81,39 +76,16 @@ pub async fn list_courses(
     Ok(Html(
         ListCoursesTemplate {
             courses_with_batch_metadata,
-            is_staff,
         }
         .render()
         .unwrap(),
     ))
 }
 
-async fn is_staff(octocrab: &Octocrab, github_org: &str) -> Result<bool, Error> {
-    let team_future = all_pages("staff team members", octocrab, async || {
-        octocrab
-            .teams(github_org)
-            .members("cyf-staff-team")
-            .send()
-            .await
-    });
-    let current = octocrab.current();
-    let self_future = current.user();
-    let (team_members, user) = join(team_future, self_future).await;
-    let team_members = team_members?;
-    let user = user.context("Failed to get current user")?;
-    for team_member in team_members {
-        if team_member.login == user.login {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
 #[derive(Template)]
 #[template(path = "list-courses.html")]
 struct ListCoursesTemplate {
     pub courses_with_batch_metadata: Vec<CourseScheduleWithBatchMetadata>,
-    pub is_staff: bool,
 }
 
 struct CourseScheduleWithBatchMetadata {
@@ -208,30 +180,26 @@ impl TraineeBatchTemplate {
     }
 }
 
-#[derive(Deserialize)]
-pub struct ReviewerParams {
-    staff: Option<bool>,
-}
-
 pub async fn get_reviewers(
     session: Session,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
     Path(course): Path<String>,
-    Query(reviewer_params): Query<ReviewerParams>,
 ) -> Result<Html<String>, Error> {
-    let is_staff = reviewer_params.staff.unwrap_or(false);
-    let mut staff_details = if is_staff {
-        let sheets_client =
-            sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
-        get_reviewer_staff_info(
-            sheets_client,
-            &server_state.config.reviewer_staff_info_sheet_id,
-        )
-        .await?
-    } else {
-        BTreeMap::new()
-    };
+    let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
+    let mut is_staff = true;
+    let mut staff_details = get_reviewer_staff_info(
+        sheets_client,
+        &server_state.config.reviewer_staff_info_sheet_id,
+    )
+    .await
+    .or_else(|err| match err {
+        Error::PotentiallyIgnorablePermissions(_) => {
+            is_staff = false;
+            Ok(BTreeMap::new())
+        }
+        err => Err(err),
+    })?;
 
     let octocrab = octocrab(&session, &server_state, original_uri).await?;
     let github_org = &server_state.config.github_org;
