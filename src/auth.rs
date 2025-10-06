@@ -73,7 +73,7 @@ async fn exchange_github_oauth_code_for_access_token(
     let client = reqwest::Client::new();
 
     let response: GitHubOauthExchangeResponse = client
-        .get(format!("https://github.com/login/oauth/access_token?client_id={client_id}&client_secret={client_secret}&code={code}", client_id = config.github_client_id, client_secret = *config.github_client_secret, code = code))
+        .get(format!("https://github.com/login/oauth/access_token?client_id={client_id}&client_secret={client_secret}&code={code}", client_id = config.github_client_id, client_secret = config.github_client_secret, code = code))
         .header(reqwest::header::ACCEPT, "application/json")
         .send()
         .await?
