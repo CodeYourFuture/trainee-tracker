@@ -23,9 +23,9 @@ jobs:
       image: rust:1.88.0-alpine
     steps:
       - uses: actions/checkout@v4
-      - name: Install gcc
-        run: apk add gcc g++
-      - name: Build validator
+      - name: Install deps
+        run: apk add docker gcc g++
+      - name: Build binaries
         run: cargo build --release
       # - name: Create release
       #   id: create_release
