@@ -13,11 +13,11 @@ use crate::{
 #[derive(Clone, Deserialize)]
 pub struct Config {
     pub github_org: String,
-    pub github_client_id: String,
+    pub github_client_id: EnvField<String>,
     pub github_client_secret: EnvField<String>,
     pub addr: Option<IpAddr>,
     pub port: u16,
-    pub public_base_url: String,
+    pub public_base_url: EnvField<String>,
     /// Courses being tracked. Keys are things like "itp" or "sdc".
     /// Ideally this would be less hard-coded.
     /// Possible sources of truth for this are:
@@ -31,7 +31,7 @@ pub struct Config {
     /// e.g. for itp, we'd expect itp-trainees/2025-05 and itp-mentors to exist.
     pub courses: IndexMap<String, CourseInfo>,
 
-    pub google_apis_client_id: String,
+    pub google_apis_client_id: EnvField<String>,
     pub google_apis_client_secret: EnvField<String>,
 
     pub slack_client_id: String,

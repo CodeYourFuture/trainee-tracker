@@ -499,6 +499,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenv"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2559,8 +2565,7 @@ dependencies = [
 [[package]]
 name = "serde-env-field"
 version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7474686d028d4a3d580ac88d7cbd54a7c5ca4f8ecb437caa8e67bb074e2fae42"
+source = "git+https://github.com/illicitonion/serde-env-field.git?rev=aa455e090a2de89c2bdc53b20e3ce010e6e79d02#aa455e090a2de89c2bdc53b20e3ce010e6e79d02"
 dependencies = [
  "serde",
  "serde-env-field-wrap",
@@ -3271,6 +3276,7 @@ dependencies = [
  "case_insensitive_string",
  "chrono",
  "chrono-tz",
+ "dotenv",
  "email_address 0.2.9 (git+https://github.com/illicitonion/rust-email_address.git?rev=12cd9762a166b79a227beaa90b2f60a768d7c55c)",
  "futures",
  "google-drive",
