@@ -218,7 +218,7 @@ type CourseAttendance = BTreeMap<String, BatchAttendance>;
 
 #[derive(Serialize)]
 pub struct AttendanceResponse {
-    courses: CourseAttendance
+    courses: CourseAttendance,
 }
 
 pub async fn fecth_attendance(
