@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use ::octocrab::models::{teams::RequestedTeam, Author};
 use anyhow::Context;
 use axum::{
@@ -11,7 +13,6 @@ use serde::Serialize;
 use tower_sessions::Session;
 
 use crate::{
-    course,
     github_accounts::get_trainees,
     newtypes::GithubLogin,
     octocrab::{all_pages, octocrab},
@@ -210,10 +211,14 @@ pub async fn get_region(
     }))
 }
 
+type SprintAttendance = BTreeMap<String, Vec<Attendance>>;
+type ModuleAttendance = BTreeMap<String, SprintAttendance>;
+type BatchAttendance = BTreeMap<String, ModuleAttendance>;
+type CourseAttendance = BTreeMap<String, BatchAttendance>;
+
 #[derive(Serialize)]
 pub struct AttendanceResponse {
-    courses:
-        IndexMap<String, IndexMap<String, IndexMap<String, IndexMap<String, Vec<Attendance>>>>>,
+    courses: CourseAttendance
 }
 
 pub async fn fecth_attendance(
@@ -225,21 +230,15 @@ pub async fn fecth_attendance(
     let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
     let github_org = &server_state.config.github_org;
     let octocrab = octocrab(&session, &server_state, original_uri).await?;
-    let mut courses: IndexMap<
-        String,
-        IndexMap<String, IndexMap<String, IndexMap<String, Vec<Attendance>>>>,
-    > = IndexMap::new();
+    let mut courses: CourseAttendance = BTreeMap::new();
     for (course_name, course_info) in all_courses {
-        let mut course_batches: IndexMap<
-            String,
-            IndexMap<String, IndexMap<String, Vec<Attendance>>>,
-        > = IndexMap::new();
+        let mut course_batches: BatchAttendance = BTreeMap::new();
         for batch_name in course_info.batches.keys() {
             let course_schedule = server_state
                 .config
-                .get_course_schedule_with_register_sheet_id(course_name.clone(), &batch_name)
+                .get_course_schedule_with_register_sheet_id(course_name.clone(), batch_name)
                 .ok_or_else(|| Error::Fatal(anyhow::anyhow!("Course not found: {course_name}")))?;
-            let mut modules: IndexMap<String, IndexMap<String, Vec<Attendance>>> = IndexMap::new();
+            let mut modules: ModuleAttendance = BTreeMap::new();
             let course = course_schedule
                 .with_assignments(&octocrab, github_org)
                 .await?;
@@ -252,13 +251,13 @@ pub async fn fecth_attendance(
             .await?;
 
             for (module_name, sprint_info) in register_info.modules {
-                let mut sprints: IndexMap<String, Vec<Attendance>> = IndexMap::new();
+                let mut sprints: SprintAttendance = BTreeMap::new();
                 for (sprint_number, sprint_info) in sprint_info.attendance.into_iter().enumerate() {
                     let mut entries: Vec<Attendance> = Vec::new();
-                    for (_index, entry) in sprint_info {
+                    for entry in sprint_info.into_values() {
                         entries.push(entry);
                     }
-                    sprints.insert(format!("Sprint {}", sprint_number + 1), entries);
+                    sprints.insert(format!("Sprint-{}", sprint_number + 1), entries);
                 }
                 modules.insert(module_name.clone(), sprints);
             }
