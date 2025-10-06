@@ -27,6 +27,8 @@ jobs:
         run: apk add docker gcc g++
       - name: Build binaries
         run: cargo build --release
+      - name: Debug listing
+        run: ls -R target/release
       # - name: Create release
       #   id: create_release
       #   uses: softprops/action-gh-release@v1
