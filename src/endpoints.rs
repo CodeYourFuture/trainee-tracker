@@ -221,50 +221,57 @@ pub struct AttendanceResponse {
     courses: CourseAttendance,
 }
 
-pub async fn fecth_attendance(
+pub async fn fetch_attendance(
     session: Session,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
 ) -> Result<Json<AttendanceResponse>, Error> {
     let all_courses = &server_state.config.courses;
     let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
-    let github_org = &server_state.config.github_org;
-    let octocrab = octocrab(&session, &server_state, original_uri).await?;
+    
     let mut courses: CourseAttendance = BTreeMap::new();
+    let mut register_futures = Vec::new();
     for (course_name, course_info) in all_courses {
-        let mut course_batches: BatchAttendance = BTreeMap::new();
         for batch_name in course_info.batches.keys() {
             let course_schedule = server_state
                 .config
                 .get_course_schedule_with_register_sheet_id(course_name.clone(), batch_name)
                 .ok_or_else(|| Error::Fatal(anyhow::anyhow!("Course not found: {course_name}")))?;
-            let mut modules: ModuleAttendance = BTreeMap::new();
-            let course = course_schedule
-                .with_assignments(&octocrab, github_org)
-                .await?;
-            let register_info = get_register(
+            let register_future = get_register(
                 sheets_client.clone(),
-                course.register_sheet_id.clone(),
-                course.start_date,
-                course.end_date,
-            )
-            .await?;
-
-            for (module_name, sprint_info) in register_info.modules {
-                let mut sprints: SprintAttendance = BTreeMap::new();
-                for (sprint_number, sprint_info) in sprint_info.attendance.into_iter().enumerate() {
-                    let mut entries: Vec<Attendance> = Vec::new();
-                    for entry in sprint_info.into_values() {
-                        entries.push(entry);
-                    }
-                    sprints.insert(format!("Sprint-{}", sprint_number + 1), entries);
-                }
-                modules.insert(module_name.clone(), sprints);
-            }
-            course_batches.insert(batch_name.clone(), modules);
+                course_schedule.register_sheet_id.clone(),
+                course_schedule.course_schedule.start,
+                course_schedule.course_schedule.end,
+            );
+            register_futures.push(async move { (course_name.clone(), batch_name.clone(), register_future.await) });
         }
-        courses.insert(course_name.clone(), course_batches);
     }
+    let register_info = join_all(register_futures).await;
 
+    for (course_name, batch_name, register_result) in register_info {
+        let register = register_result?;
+            let modules = register.modules
+            .into_iter()
+            .map(|(module_name, sprint_info)|{
+                (
+                    module_name,
+                    sprint_info
+                        .attendance
+                        .into_iter()
+                        .enumerate()
+                        .map(|(sprint_number, sprint_info)| {
+                            (
+                                format!("Sprint-{}", sprint_number + 1),
+                                sprint_info.into_values().collect(),
+                            )
+                        }).collect()
+                )
+            })
+            .collect();
+        courses
+            .entry(course_name)
+            .or_default()
+            .insert(batch_name, modules);
+        }
     Ok(Json(AttendanceResponse { courses }))
 }

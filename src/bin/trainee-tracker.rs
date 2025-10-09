@@ -102,7 +102,7 @@ async fn main() {
         )
         .route(
             "/api/attendance",
-            get(trainee_tracker::endpoints::fecth_attendance),
+            get(trainee_tracker::endpoints::fetch_attendance),
         )
         .layer(session_layer)
         .with_state(server_state);
