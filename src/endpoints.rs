@@ -228,7 +228,7 @@ pub async fn fetch_attendance(
 ) -> Result<Json<AttendanceResponse>, Error> {
     let all_courses = &server_state.config.courses;
     let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
-    
+
     let mut courses: CourseAttendance = BTreeMap::new();
     let mut register_futures = Vec::new();
     for (course_name, course_info) in all_courses {
@@ -243,16 +243,23 @@ pub async fn fetch_attendance(
                 course_schedule.course_schedule.start,
                 course_schedule.course_schedule.end,
             );
-            register_futures.push(async move { (course_name.clone(), batch_name.clone(), register_future.await) });
+            register_futures.push(async move {
+                (
+                    course_name.clone(),
+                    batch_name.clone(),
+                    register_future.await,
+                )
+            });
         }
     }
     let register_info = join_all(register_futures).await;
 
     for (course_name, batch_name, register_result) in register_info {
         let register = register_result?;
-            let modules = register.modules
+        let modules = register
+            .modules
             .into_iter()
-            .map(|(module_name, sprint_info)|{
+            .map(|(module_name, sprint_info)| {
                 (
                     module_name,
                     sprint_info
@@ -264,7 +271,8 @@ pub async fn fetch_attendance(
                                 format!("Sprint-{}", sprint_number + 1),
                                 sprint_info.into_values().collect(),
                             )
-                        }).collect()
+                        })
+                        .collect(),
                 )
             })
             .collect();
@@ -272,6 +280,6 @@ pub async fn fetch_attendance(
             .entry(course_name)
             .or_default()
             .insert(batch_name, modules);
-        }
+    }
     Ok(Json(AttendanceResponse { courses }))
 }
