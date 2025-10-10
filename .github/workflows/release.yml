@@ -13,9 +13,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # To create a release.
+      contents: write
+      # To push a docker image.
       packages: write
+      # To push an attestation.
       attestations: write
+      # Presumably used to log into the GitHub Container Registry, as per https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions.
       id-token: write
     container:
       image: rust:1.88.0-alpine
