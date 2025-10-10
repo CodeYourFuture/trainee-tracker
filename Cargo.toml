@@ -38,8 +38,7 @@ regex = "1.11.1"
 reqwest = { version = "0.12.20", default-features = false, features = ["json", "rustls-tls"] }
 secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
-# Until https://github.com/mrshiposha/serde-env-field/pull/2 is merged and released.
-serde-env-field = { git = "https://github.com/illicitonion/serde-env-field.git", rev = "aa455e090a2de89c2bdc53b20e3ce010e6e79d02" }
+serde-env-field = "0.4.0"
 serde_json = "1"
 serde_urlencoded = "0.7.1"
 sheets = "0.7.0"
