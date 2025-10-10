@@ -28,16 +28,8 @@ jobs:
       - name: Install deps
         run: apk add docker gcc g++
       - name: Build binaries
-        run: cargo build --release
-      - name: Upload validator to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_name: pr-metadata-validator-musl-${{ github.ref_name }}
-          asset_path: target/release/pr-metadata-validator
-          asset_content_type: application/octet-stream
+        # Copy file to rename for the release action
+        run: cargo build --release && cp target/release/pr-metadata-validator pr-metadata-validator-musl-${{ github.ref_name }}
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
@@ -65,10 +57,11 @@ jobs:
           push-to-registry: true
       - name: Create release
         id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2.4.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.base_ref }}
+          files: pr-metadata-validator-musl-${{ github.ref_name }}
