@@ -48,6 +48,7 @@ pub async fn get_mentoring_records(
                 )
             })
         })?;
+    let expected_sheet_title = "Feedback";
     let sheet = data
         .body
         .sheets
@@ -57,11 +58,12 @@ pub async fn get_mentoring_records(
                 .properties
                 .as_ref()
                 .map(|properties| properties.title.as_str())
-                == Some("Sheet1")
+                == Some(expected_sheet_title)
         })
         .ok_or_else(|| {
             Error::Fatal(anyhow::anyhow!(
-                "Couldn't find Sheet1 in spreadsheet with ID {}",
+                "Couldn't find sheet '{}' in spreadsheet with ID {}",
+                expected_sheet_title,
                 mentoring_records_sheet_id
             ))
         })?;
