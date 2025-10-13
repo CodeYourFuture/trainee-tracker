@@ -15,7 +15,6 @@ use crate::{
 pub(crate) async fn get_trainees(
     client: SheetsClient,
     sheet_id: &str,
-    extra_trainees: BTreeMap<GithubLogin, Trainee>,
 ) -> Result<BTreeMap<GithubLogin, Trainee>, Error> {
     const EXPECTED_SHEET_NAME: &str = "Form responses 1";
     let data = client.get(sheet_id, true, &[]).await.map_err(|err| {
@@ -34,7 +33,7 @@ pub(crate) async fn get_trainees(
         }
     });
     if let Some(sheet) = sheet {
-        let data = trainees_from_sheet(&sheet, extra_trainees).map_err(|err| {
+        let data = trainees_from_sheet(&sheet).map_err(|err| {
             err.with_context(|| {
                 format!(
                     "Failed to read trainees from sheet {}",
@@ -64,11 +63,8 @@ pub struct Trainee {
     pub email: EmailAddress,
 }
 
-fn trainees_from_sheet(
-    sheet: &Sheet,
-    extra_trainees: BTreeMap<GithubLogin, Trainee>,
-) -> Result<BTreeMap<GithubLogin, Trainee>, Error> {
-    let mut trainees = extra_trainees;
+fn trainees_from_sheet(sheet: &Sheet) -> Result<BTreeMap<GithubLogin, Trainee>, Error> {
+    let mut trainees = BTreeMap::new();
     for data in &sheet.data {
         if data.start_column != 0 || data.start_row != 0 {
             return Err(Error::Fatal(anyhow::anyhow!("Reading data from Google Sheets API - got data chunk that didn't start at row=0,column=0 - got row={},column={}", data.start_row, data.start_column)));

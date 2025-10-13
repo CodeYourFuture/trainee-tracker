@@ -5,10 +5,7 @@ use indexmap::IndexMap;
 use serde::Deserialize;
 use serde_env_field::EnvField;
 
-use crate::{
-    github_accounts::Trainee,
-    newtypes::{GithubLogin, Region},
-};
+use crate::newtypes::Region;
 
 #[derive(Clone, Deserialize)]
 pub struct Config {
@@ -40,9 +37,6 @@ pub struct Config {
     pub github_email_mapping_sheet_id: String,
 
     pub reviewer_staff_info_sheet_id: String,
-
-    // Legacy hack until all trainees are in the sheet.
-    pub extra_trainee_github_mappings: BTreeMap<GithubLogin, Trainee>,
 }
 
 #[derive(Clone, Deserialize)]

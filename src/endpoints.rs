@@ -201,7 +201,6 @@ pub async fn get_region(
     let trainees = get_trainees(
         sheets_client,
         &server_state.config.github_email_mapping_sheet_id,
-        server_state.config.extra_trainee_github_mappings,
     )
     .await?;
     Ok(Json(Region {

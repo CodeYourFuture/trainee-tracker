@@ -116,7 +116,6 @@ pub async fn get_trainee_batch(
         github_org,
         &batch_github_slug,
         &course,
-        server_state.config.extra_trainee_github_mappings,
     )
     .await?;
     batch
