@@ -20,6 +20,7 @@ pub mod frontend;
 pub mod github_accounts;
 pub mod google_auth;
 pub mod google_groups;
+pub mod mentoring;
 pub mod newtypes;
 pub mod octocrab;
 pub mod prs;

@@ -113,6 +113,7 @@ pub async fn get_trainee_batch(
         &octocrab,
         sheets_client,
         &server_state.config.github_email_mapping_sheet_id,
+        &server_state.config.mentoring_records_sheet_id,
         github_org,
         &batch_github_slug,
         &course,

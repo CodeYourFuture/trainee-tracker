@@ -107,6 +107,7 @@ pub async fn handle_google_oauth_callback(
         "{}/api/oauth-callbacks/google-drive",
         server_state.config.public_base_url
     );
+
     let mut client = Client::new(
         server_state.config.google_apis_client_id.clone(),
         (*server_state.config.google_apis_client_secret).clone(),
@@ -119,6 +120,11 @@ pub async fn handle_google_oauth_callback(
         .get_access_token(&params.code, params.state.to_string().as_str())
         .await
         .context("Failed to get access token")?;
+
+    if access_token.access_token.is_empty() {
+        return Err(Error::Fatal(anyhow!("Google gave an empty token")));
+    }
+
     session
         .insert(
             auth_state.google_scope.token_session_key(),

@@ -36,6 +36,8 @@ pub struct Config {
 
     pub github_email_mapping_sheet_id: String,
 
+    pub mentoring_records_sheet_id: String,
+
     pub reviewer_staff_info_sheet_id: String,
 }
 
