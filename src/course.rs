@@ -605,14 +605,8 @@ pub async fn get_batch_members(
     github_email_mapping_sheet_id: &str,
     github_org: &str,
     batch_github_slug: &str,
-    extra_trainees: BTreeMap<GithubLogin, Trainee>,
 ) -> Result<BatchMembers, Error> {
-    let trainee_info = get_trainees(
-        sheets_client.clone(),
-        github_email_mapping_sheet_id,
-        extra_trainees,
-    )
-    .await?;
+    let trainee_info = get_trainees(sheets_client.clone(), github_email_mapping_sheet_id).await?;
 
     let members = all_pages("members", octocrab, async || {
         octocrab
@@ -654,7 +648,6 @@ pub async fn get_batch_with_submissions(
     github_org: &str,
     batch_github_slug: &str,
     course: &Course,
-    extra_trainees: BTreeMap<GithubLogin, Trainee>,
 ) -> Result<Batch, Error> {
     let register_info = get_register(
         sheets_client.clone(),
@@ -670,7 +663,6 @@ pub async fn get_batch_with_submissions(
         github_email_mapping_sheet_id,
         github_org,
         batch_github_slug,
-        extra_trainees,
     )
     .await?;
 
