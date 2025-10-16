@@ -3,6 +3,7 @@ use std::collections::{btree_map::Entry, BTreeMap};
 use anyhow::Context;
 use chrono::{NaiveDate, Utc};
 use serde::Serialize;
+use sheets::types::GridData;
 use tracing::warn;
 
 use crate::{
@@ -37,42 +38,13 @@ pub async fn get_mentoring_records(
     client: SheetsClient,
     mentoring_records_sheet_id: &str,
 ) -> Result<MentoringRecords, Error> {
-    let data = client
-        .get(mentoring_records_sheet_id, true, &[])
-        .await
-        .map_err(|err| {
-            err.with_context(|| {
-                format!(
-                    "Failed to get spreadsheet with ID {}",
-                    mentoring_records_sheet_id
-                )
-            })
-        })?;
-    let expected_sheet_title = "Feedback";
-    let sheet = data
-        .body
-        .sheets
-        .into_iter()
-        .find(|sheet| {
-            sheet
-                .properties
-                .as_ref()
-                .map(|properties| properties.title.as_str())
-                == Some(expected_sheet_title)
-        })
-        .ok_or_else(|| {
-            Error::Fatal(anyhow::anyhow!(
-                "Couldn't find sheet '{}' in spreadsheet with ID {}",
-                expected_sheet_title,
-                mentoring_records_sheet_id
-            ))
-        })?;
+    let sheet_data = get_mentoring_records_grid_data(client, mentoring_records_sheet_id).await?;
 
     let mut mentoring_records = MentoringRecords {
         records: BTreeMap::new(),
     };
 
-    for sheet_data in sheet.data {
+    for sheet_data in sheet_data {
         if sheet_data.start_column != 0 || sheet_data.start_row != 0 {
             return Err(Error::Fatal(anyhow::anyhow!(
                 "Start column and row were {} and {}, expected 0 and 0",
@@ -123,4 +95,46 @@ pub async fn get_mentoring_records(
         }
     }
     Ok(mentoring_records)
+}
+
+async fn get_mentoring_records_grid_data(
+    client: SheetsClient,
+    mentoring_records_sheet_id: &str,
+) -> Result<Vec<GridData>, Error> {
+    let data_result = client.get(mentoring_records_sheet_id, true, &[]).await;
+    let data = match data_result {
+        Ok(data) => data,
+        Err(Error::PotentiallyIgnorablePermissions(_)) => {
+            return Ok(Vec::new());
+        }
+        Err(err) => {
+            let err = err.with_context(|| {
+                format!(
+                    "Failed to get spreadsheet with ID {}",
+                    mentoring_records_sheet_id
+                )
+            });
+            return Err(err);
+        }
+    };
+    let expected_sheet_title = "Feedback";
+    let sheet = data
+        .body
+        .sheets
+        .into_iter()
+        .find(|sheet| {
+            sheet
+                .properties
+                .as_ref()
+                .map(|properties| properties.title.as_str())
+                == Some(expected_sheet_title)
+        })
+        .ok_or_else(|| {
+            Error::Fatal(anyhow::anyhow!(
+                "Couldn't find sheet '{}' in spreadsheet with ID {}",
+                expected_sheet_title,
+                mentoring_records_sheet_id
+            ))
+        })?;
+    Ok(sheet.data)
 }
