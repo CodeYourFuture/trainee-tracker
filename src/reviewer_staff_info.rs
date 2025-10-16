@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use anyhow::Context;
 use sheets::types::Sheet;
 
 use crate::{
@@ -70,19 +69,14 @@ fn reviewer_staff_detail_from_sheet(
                 continue;
             }
 
-            let github_login = GithubLogin::from(
-                cell_string(&cells[0]).context("Failed to read reviewer github login")?,
-            );
+            let github_login = GithubLogin::from(cell_string(&cells[0]));
 
             let notes = match cells.get(6) {
-                Some(cell) => cell_string(cell).context("Failed to read reviewer notes")?,
+                Some(cell) => cell_string(cell),
                 None => String::new(),
             };
 
-            let checked = match (
-                cell_bool(&cells[3]).context("Failed to read reviewer checked")?,
-                cell_bool(&cells[4]).context("Failed to read reviewer check again")?,
-            ) {
+            let checked = match (cell_bool(&cells[3]), cell_bool(&cells[4])) {
                 (true, false) => CheckStatus::CheckedAndOk,
                 (true, true) => CheckStatus::CheckedAndCheckAgain,
                 (false, _) => CheckStatus::Unchecked,
@@ -91,11 +85,10 @@ fn reviewer_staff_detail_from_sheet(
             reviewers.insert(
                 github_login.clone(),
                 ReviewerStaffOnlyDetails {
-                    name: cell_string(&cells[1]).context("Failed to read reviewer name")?,
-                    attended_training: cell_bool(&cells[2])
-                        .context("Failed to read reviewer attended training state")?,
+                    name: cell_string(&cells[1]),
+                    attended_training: cell_bool(&cells[2]),
                     checked,
-                    quality: cell_string(&cells[5]).context("Failed to read reviewer quality")?,
+                    quality: cell_string(&cells[5]),
                     notes,
                 },
             );

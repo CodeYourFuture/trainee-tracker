@@ -78,19 +78,15 @@ fn trainees_from_sheet(sheet: &Sheet) -> Result<BTreeMap<GithubLogin, Trainee>, 
                 return Err(Error::Fatal(anyhow::anyhow!("Reading trainee data from Google Sheets API, row {} didn't have at least 5 columns", row_index)));
             }
 
-            let github_login = GithubLogin::from(
-                cell_string(&cells[3]).context("Failed to read trainee github login")?,
-            );
+            let github_login = GithubLogin::from(cell_string(&cells[3]));
 
-            let email = cell_string(&cells[4]).context("Failed to read trainee email")?;
+            let email = cell_string(&cells[4]);
 
             trainees.insert(
                 github_login.clone(),
                 Trainee {
-                    name: cell_string(&cells[1]).context("Failed to read trainee name")?,
-                    region: Region(
-                        cell_string(&cells[2]).context("Failed to read trainee region")?,
-                    ),
+                    name: cell_string(&cells[1]),
+                    region: Region(cell_string(&cells[2])),
                     github_login,
                     email: new_case_insensitive_email_address(&email)
                         .with_context(|| format!("Failed to parse trainee email {}", email))?,
