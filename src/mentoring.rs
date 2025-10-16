@@ -55,7 +55,10 @@ pub async fn get_mentoring_records(
 
         for (row_number, row) in sheet_data.row_data.into_iter().enumerate() {
             let cells = row.values;
-            if cells.len() < 6 {
+            if cells.is_empty() {
+                continue;
+            }
+            if cells.len() < 6 && !cell_string(&cells[0]).is_empty() {
                 warn!(
                     "Parsing mentoring data from Google Sheet with ID {}: Not enough columns for row {} - expected at least 6, got {} containing: {}",
                     mentoring_records_sheet_id,
