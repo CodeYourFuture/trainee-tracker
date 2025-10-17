@@ -125,10 +125,7 @@ fn read_module(
         for (row_number, row) in data.row_data.into_iter().enumerate() {
             let cells = row.values;
             // Some sheets have documentation or pivot table
-            if row_number == 0
-                && !cells.is_empty()
-                && cell_string(&cells[0]).unwrap_or_default() != "Name"
-            {
+            if row_number == 0 && !cells.is_empty() && cell_string(&cells[0]) != "Name" {
                 continue 'sheet;
             }
             if cells.len() < 7 {
@@ -140,15 +137,7 @@ fn read_module(
                 ));
             }
             if row_number == 0 {
-                let headings = cells
-                    .iter()
-                    .take(7)
-                    .enumerate()
-                    .map(|(col_number, cell)| {
-                        cell_string(cell)
-                            .with_context(|| format!("Failed to get row 0 column {}", col_number))
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                let headings = cells.iter().take(7).map(cell_string).collect::<Vec<_>>();
                 if headings
                     != [
                         "Name",
@@ -200,18 +189,13 @@ fn read_row(
     cells: &[CellData],
     register_url: String,
 ) -> Result<(usize, Attendance), anyhow::Error> {
-    let sprint_number = extract_sprint_number(
-        &cell_string(&cells[5]).context("Couldn't get sprint value from column 5")?,
-    )?;
-    let name = cell_string(&cells[0]).context("Failed to read name")?;
-    let email = new_case_insensitive_email_address(
-        &cell_string(&cells[1]).context("Failed to read email")?,
-    )?;
-    let timestamp =
-        DateTime::parse_from_rfc3339(&cell_string(&cells[2]).context("Failed to read timestamp")?)
-            .context("Failed to parse timestamp")?
-            .to_utc();
-    let region = cell_string(&cells[6]).context("Failed to read region")?;
+    let sprint_number = extract_sprint_number(&cell_string(&cells[5]))?;
+    let name = cell_string(&cells[0]);
+    let email = new_case_insensitive_email_address(&cell_string(&cells[1]))?;
+    let timestamp = DateTime::parse_from_rfc3339(&cell_string(&cells[2]))
+        .context("Failed to parse timestamp")?
+        .to_utc();
+    let region = cell_string(&cells[6]);
     Ok((
         sprint_number,
         Attendance {

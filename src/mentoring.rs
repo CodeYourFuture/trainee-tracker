@@ -94,15 +94,7 @@ pub async fn get_mentoring_records(
                 continue;
             }
             if row_number == 0 {
-                let headings = cells
-                    .iter()
-                    .take(6)
-                    .enumerate()
-                    .map(|(col_number, cell)| {
-                        cell_string(cell)
-                            .with_context(|| format!("Failed to get row 0 column {}", col_number))
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+                let headings = cells.iter().take(6).map(cell_string).collect::<Vec<_>>();
                 if headings != ["Name", "Region", "Date", "Staff", "Status", "Notes"] {
                     return Err(Error::Fatal(anyhow::anyhow!(
                         "Mentoring data sheet contained wrong headings: {}",
@@ -113,8 +105,7 @@ pub async fn get_mentoring_records(
                 if cells[0].effective_value.is_none() {
                     break;
                 }
-                let name = cell_string(&cells[0])
-                    .with_context(|| format!("Failed to read name from row {}", row_number + 1))?;
+                let name = cell_string(&cells[0]);
                 let date = cell_date(&cells[2])
                     .with_context(|| format!("Failed to parse date from row {}", row_number + 1))?;
                 let entry = mentoring_records.records.entry(name);

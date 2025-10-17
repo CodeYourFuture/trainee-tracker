@@ -8,21 +8,21 @@ use crate::{
     Error, ServerState,
 };
 
-pub(crate) fn cell_string(cell: &CellData) -> Result<String, anyhow::Error> {
+pub(crate) fn cell_string(cell: &CellData) -> String {
     let value = cell.effective_value.clone();
     if let Some(value) = value {
-        Ok(value.string_value)
+        value.string_value
     } else {
-        Ok(String::new())
+        String::new()
     }
 }
 
-pub(crate) fn cell_bool(cell: &CellData) -> Result<bool, anyhow::Error> {
+pub(crate) fn cell_bool(cell: &CellData) -> bool {
     let value = cell.effective_value.clone();
     if let Some(value) = value {
-        Ok(value.bool_value)
+        value.bool_value
     } else {
-        Ok(false)
+        false
     }
 }
 
