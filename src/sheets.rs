@@ -1,5 +1,5 @@
 use anyhow::Context;
-use http::Uri;
+use http::{HeaderMap, Uri};
 use sheets::{spreadsheets::Spreadsheets, types::CellData};
 use tower_sessions::Session;
 
@@ -35,12 +35,18 @@ pub(crate) fn cell_date(cell: &CellData) -> Result<chrono::NaiveDate, anyhow::Er
 pub(crate) async fn sheets_client(
     session: &Session,
     server_state: ServerState,
+    headers: HeaderMap,
     original_uri: Uri,
 ) -> Result<SheetsClient, Error> {
-    let maybe_token: Option<String> = session
+    let maybe_token = if let Some(auth_header) = headers.get("x-authorization-google") {
+        let token = auth_header.to_str().unwrap_or_default().to_string();
+        Some(token)
+    } else {
+        session
         .get(GoogleScope::Sheets.token_session_key())
         .await
-        .context("Session load error")?;
+        .context("Session load error")?
+    };  
 
     let redirect_endpoint = redirect_endpoint(&server_state);
 
