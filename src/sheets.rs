@@ -43,10 +43,10 @@ pub(crate) async fn sheets_client(
         Some(token)
     } else {
         session
-        .get(GoogleScope::Sheets.token_session_key())
-        .await
-        .context("Session load error")?
-    };  
+            .get(GoogleScope::Sheets.token_session_key())
+            .await
+            .context("Session load error")?
+    };
 
     let redirect_endpoint = redirect_endpoint(&server_state);
 

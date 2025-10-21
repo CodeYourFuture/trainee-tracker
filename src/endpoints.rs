@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use http::HeaderMap;
 use ::octocrab::models::{teams::RequestedTeam, Author};
 use anyhow::Context;
 use axum::{
@@ -9,6 +8,7 @@ use axum::{
     Json,
 };
 use futures::future::join_all;
+use http::HeaderMap;
 use indexmap::IndexMap;
 use serde::Serialize;
 use tower_sessions::Session;
@@ -199,7 +199,13 @@ pub async fn get_region(
     OriginalUri(original_uri): OriginalUri,
     Path(github_login): Path<String>,
 ) -> Result<Json<Region>, Error> {
-    let sheets_client = sheets_client(&session, server_state.clone(), headers, original_uri.clone()).await?;
+    let sheets_client = sheets_client(
+        &session,
+        server_state.clone(),
+        headers,
+        original_uri.clone(),
+    )
+    .await?;
     let trainees = get_trainees(
         sheets_client,
         &server_state.config.github_email_mapping_sheet_id,
@@ -229,7 +235,13 @@ pub async fn fetch_attendance(
     OriginalUri(original_uri): OriginalUri,
 ) -> Result<Json<AttendanceResponse>, Error> {
     let all_courses = &server_state.config.courses;
-    let sheets_client = sheets_client(&session, server_state.clone(), headers, original_uri.clone()).await?;
+    let sheets_client = sheets_client(
+        &session,
+        server_state.clone(),
+        headers,
+        original_uri.clone(),
+    )
+    .await?;
 
     let mut courses: CourseAttendance = BTreeMap::new();
     let mut register_futures = Vec::new();
