@@ -48,7 +48,7 @@ pub(crate) async fn sheets_client(
                 )))
             }
         };
-        Some(token)
+        token
     } else {
         session
             .get(GoogleScope::Sheets.token_session_key())
