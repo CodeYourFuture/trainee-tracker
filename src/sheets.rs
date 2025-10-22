@@ -39,7 +39,15 @@ pub(crate) async fn sheets_client(
     original_uri: Uri,
 ) -> Result<SheetsClient, Error> {
     let maybe_token = if let Some(auth_header) = headers.get("x-authorization-google") {
-        let token = auth_header.to_str().unwrap_or_default().to_string();
+        let token = match auth_header.to_str() {
+            Ok(s) => Some(s.to_string()),
+            Err(e) => {
+                return Err(Error::UserFacing(format!(
+                    "Invalid token in the header: {}",
+                    e
+                )))
+            }
+        };
         Some(token)
     } else {
         session
