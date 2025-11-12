@@ -7,7 +7,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use futures::future::join_all;
-use http::{header::CONTENT_TYPE, StatusCode, Uri};
+use http::{header::CONTENT_TYPE, HeaderMap, StatusCode, Uri};
 use serde::Deserialize;
 use tower_sessions::Session;
 
@@ -95,11 +95,18 @@ struct CourseScheduleWithBatchMetadata {
 
 pub async fn get_trainee_batch(
     session: Session,
+    headers: HeaderMap,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
     Path((course, batch_github_slug)): Path<(String, String)>,
 ) -> Result<Html<String>, Error> {
-    let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
+    let sheets_client = sheets_client(
+        &session,
+        server_state.clone(),
+        headers,
+        original_uri.clone(),
+    )
+    .await?;
     let github_org = &server_state.config.github_org;
     let course_schedule = server_state
         .config
@@ -182,11 +189,18 @@ impl TraineeBatchTemplate {
 
 pub async fn get_reviewers(
     session: Session,
+    headers: HeaderMap,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
     Path(course): Path<String>,
 ) -> Result<Html<String>, Error> {
-    let sheets_client = sheets_client(&session, server_state.clone(), original_uri.clone()).await?;
+    let sheets_client = sheets_client(
+        &session,
+        server_state.clone(),
+        headers,
+        original_uri.clone(),
+    )
+    .await?;
     let mut is_staff = true;
     let mut staff_details = get_reviewer_staff_info(
         sheets_client,
