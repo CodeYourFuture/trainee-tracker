@@ -1,6 +1,5 @@
 use anyhow::Context;
 use http::{HeaderMap, Uri};
-use octocrab::auth;
 use sheets::{spreadsheets::Spreadsheets, types::CellData};
 use tower_sessions::Session;
 
