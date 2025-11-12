@@ -44,7 +44,7 @@ pub(crate) async fn sheets_client(
             Ok(s) => Some(s.to_string()),
             Err(e) => {
                 return Err(Error::UserFacing(format!(
-                    "Invalid {} in the header: {}",
+                    "Invalid {} header: {}",
                     AUTHORIZATION_HEADER, e
                 )))
             }
