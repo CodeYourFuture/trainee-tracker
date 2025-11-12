@@ -1,5 +1,6 @@
 use anyhow::Context;
 use http::{HeaderMap, Uri};
+use octocrab::auth;
 use sheets::{spreadsheets::Spreadsheets, types::CellData};
 use tower_sessions::Session;
 
@@ -38,13 +39,14 @@ pub(crate) async fn sheets_client(
     headers: HeaderMap,
     original_uri: Uri,
 ) -> Result<SheetsClient, Error> {
-    let maybe_token = if let Some(auth_header) = headers.get("x-authorization-google") {
+    const AUTHORIZATION_HEADER: &str = "x-authorization-google";
+    let maybe_token = if let Some(auth_header) = headers.get(AUTHORIZATION_HEADER) {
         let token = match auth_header.to_str() {
             Ok(s) => Some(s.to_string()),
             Err(e) => {
                 return Err(Error::UserFacing(format!(
-                    "Invalid token in the header: {}",
-                    e
+                    "Invalid {} in the header: {}",
+                    AUTHORIZATION_HEADER, e
                 )))
             }
         };
