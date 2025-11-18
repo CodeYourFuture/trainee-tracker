@@ -85,11 +85,18 @@ async fn main() {
         .create_comment(pr_number, full_message)
         .await
         .expect("Failed to create comment with validation error");
-    octocrab
+    let remove_label_response = octocrab
         .issues(&github_org_name, &module_name)
         .remove_label(pr_number, "Needs Review")
-        .await
-        .ok(); // this gives an error if the label does not exist (i.e. already removed), we allow it
+        .await;
+    match remove_label_response {
+        Ok(_) => { println!("Found issues for PR #{}, notified and removed label", pr_number); },
+        Err(octocrab::Error::GitHub { source, .. }) if source.status_code == 404 => {
+            println!("Found issues for PR #{}, notified and label already removed", pr_number);
+            // The only time this API 404s is if the label is already removed. Continue without error.
+        },
+        err => { eprintln!("Error removing label: {:?}", err); },
+    };
     exit(2);
 }
 
