@@ -78,13 +78,35 @@ async fn main() {
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
     };
 
-    let full_message = format!("{message}\n\nIf this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed).");
+    let full_message = format!("{message}\n\nIf this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed).\n\nIf this PR needs reviewed, please add the 'Needs Review' label to this PR after you have resolved the issues listed above.");
     eprintln!("{}", full_message);
     octocrab
-        .issues(github_org_name, module_name)
+        .issues(&github_org_name, &module_name)
         .create_comment(pr_number, full_message)
         .await
         .expect("Failed to create comment with validation error");
+    let remove_label_response = octocrab
+        .issues(&github_org_name, &module_name)
+        .remove_label(pr_number, "Needs Review")
+        .await;
+    match remove_label_response {
+        Ok(_) => {
+            println!(
+                "Found issues for PR #{}, notified and removed label",
+                pr_number
+            );
+        }
+        Err(octocrab::Error::GitHub { source, .. }) if source.status_code == 404 => {
+            println!(
+                "Found issues for PR #{}, notified and label already removed",
+                pr_number
+            );
+            // The only time this API 404s is if the label is already removed. Continue without error.
+        }
+        err => {
+            eprintln!("Error removing label: {:?}", err);
+        }
+    };
     exit(2);
 }
 
