@@ -207,14 +207,14 @@ pub(crate) async fn fill_in_reviewers(
         .collect())
 }
 
-#[derive(PartialEq, Eq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub(crate) enum CheckStatus {
     CheckedAndOk,
     CheckedAndCheckAgain,
     Unchecked,
 }
 
-#[derive(PartialEq, Eq, Serialize)]
+#[derive(Debug, PartialEq, Eq, Serialize)]
 pub(crate) struct ReviewerStaffOnlyDetails {
     pub(crate) name: String,
     pub(crate) attended_training: bool,

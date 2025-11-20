@@ -3,12 +3,11 @@ use std::collections::BTreeMap;
 use anyhow::Context;
 use email_address::EmailAddress;
 use serde::{Deserialize, Serialize};
-use sheets::types::Sheet;
 
 use crate::{
     Error,
     newtypes::{GithubLogin, Region, new_case_insensitive_email_address},
-    sheets::{SheetsClient, cell_string},
+    sheets::{Sheet, SheetsClient, cell_string},
 };
 
 // TODO: Replace this with a serde implementation from a Google Sheet.
@@ -17,7 +16,7 @@ pub(crate) async fn get_trainees(
     sheet_id: &str,
 ) -> Result<BTreeMap<GithubLogin, Trainee>, Error> {
     const EXPECTED_SHEET_NAME: &str = "Form responses 1";
-    let data = client.get(sheet_id, true, &[]).await.map_err(|err| {
+    let data = client.get(sheet_id).await.map_err(|err| {
         err.with_context(|| {
             format!(
                 "Failed to get trainees github accounts sheet with id {}",
@@ -25,24 +24,11 @@ pub(crate) async fn get_trainees(
             )
         })
     })?;
-    let sheet = data.body.sheets.into_iter().find(|sheet| {
-        if let Some(properties) = &sheet.properties {
-            properties.title == EXPECTED_SHEET_NAME
-        } else {
-            false
-        }
-    });
+    let sheet = data.get(EXPECTED_SHEET_NAME);
     if let Some(sheet) = sheet {
         let data = trainees_from_sheet(&sheet).map_err(|err| {
             err.with_context(|| {
-                format!(
-                    "Failed to read trainees from sheet {}",
-                    sheet
-                        .properties
-                        .map(|properties| properties.title)
-                        .as_deref()
-                        .unwrap_or("<unknown>")
-                )
+                format!("Failed to read trainees from sheet {}", EXPECTED_SHEET_NAME,)
             })
         })?;
         Ok(data)
@@ -65,41 +51,31 @@ pub struct Trainee {
 
 fn trainees_from_sheet(sheet: &Sheet) -> Result<BTreeMap<GithubLogin, Trainee>, Error> {
     let mut trainees = BTreeMap::new();
-    for data in &sheet.data {
-        if data.start_column != 0 || data.start_row != 0 {
+    for (row_index, cells) in sheet.rows.iter().enumerate() {
+        if row_index == 0 {
+            continue;
+        }
+        if cells.len() < 5 {
             return Err(Error::Fatal(anyhow::anyhow!(
-                "Reading data from Google Sheets API - got data chunk that didn't start at row=0,column=0 - got row={},column={}",
-                data.start_row,
-                data.start_column
+                "Reading trainee data from Google Sheets API, row {} didn't have at least 5 columns",
+                row_index
             )));
         }
-        for (row_index, row) in data.row_data.iter().enumerate() {
-            if row_index == 0 {
-                continue;
-            }
-            let cells = &row.values;
-            if cells.len() < 5 {
-                return Err(Error::Fatal(anyhow::anyhow!(
-                    "Reading trainee data from Google Sheets API, row {} didn't have at least 5 columns",
-                    row_index
-                )));
-            }
 
-            let github_login = GithubLogin::from(cell_string(&cells[3]));
+        let github_login = GithubLogin::from(cell_string(&cells[3]));
 
-            let email = cell_string(&cells[4]);
+        let email = cell_string(&cells[4]);
 
-            trainees.insert(
-                github_login.clone(),
-                Trainee {
-                    name: cell_string(&cells[1]),
-                    region: Region(cell_string(&cells[2])),
-                    github_login,
-                    email: new_case_insensitive_email_address(&email)
-                        .with_context(|| format!("Failed to parse trainee email {}", email))?,
-                },
-            );
-        }
+        trainees.insert(
+            github_login.clone(),
+            Trainee {
+                name: cell_string(&cells[1]),
+                region: Region(cell_string(&cells[2])),
+                github_login,
+                email: new_case_insensitive_email_address(&email)
+                    .with_context(|| format!("Failed to parse trainee email {}", email))?,
+            },
+        );
     }
 
     Ok(trainees)
