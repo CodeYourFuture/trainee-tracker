@@ -21,8 +21,17 @@ async fn main() {
 
     let octocrab = octocrab_for_token(github_token.to_owned()).expect("Failed to get octocrab");
 
-    let Ok([_https, _scheme, _githubdotcom, org_name, module_name, _pull, pr_number_str]) =
-        <[_; 7]>::try_from(pr_link.split('/').collect::<Vec<_>>())
+    let Ok(
+        [
+            _https,
+            _scheme,
+            _githubdotcom,
+            org_name,
+            module_name,
+            _pull,
+            pr_number_str,
+        ],
+    ) = <[_; 7]>::try_from(pr_link.split('/').collect::<Vec<_>>())
     else {
         panic!("Couldn't parse GitHub PR link {}", pr_link);
     };

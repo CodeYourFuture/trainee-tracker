@@ -6,12 +6,12 @@ use maplit::btreemap;
 use octocrab::Octocrab;
 use regex::Regex;
 use trainee_tracker::{
+    Error,
     config::{CourseSchedule, CourseScheduleWithRegisterSheetId},
     course::match_prs_to_assignments,
     newtypes::Region,
     octocrab::octocrab_for_token,
     prs::get_prs,
-    Error,
 };
 
 const ARBITRARY_REGION: Region = Region(String::new());
@@ -24,7 +24,15 @@ async fn main() {
     };
     let pr_parts: Vec<_> = pr_url.split("/").collect();
     let (github_org_name, module_name, pr_number) = match pr_parts.as_slice() {
-        [_http, _scheme, _domain, github_org_name, module_name, _pull, number] => (
+        [
+            _http,
+            _scheme,
+            _domain,
+            github_org_name,
+            module_name,
+            _pull,
+            number,
+        ] => (
             (*github_org_name).to_owned(),
             (*module_name).to_owned(),
             number.parse::<u64>().expect("Failed to parse PR number"),
@@ -78,7 +86,9 @@ async fn main() {
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
     };
 
-    let full_message = format!("{message}\n\nIf this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed).\n\nIf this PR needs reviewed, please add the 'Needs Review' label to this PR after you have resolved the issues listed above.");
+    let full_message = format!(
+        "{message}\n\nIf this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed).\n\nIf this PR needs reviewed, please add the 'Needs Review' label to this PR after you have resolved the issues listed above."
+    );
     eprintln!("{}", full_message);
     octocrab
         .issues(&github_org_name, &module_name)
@@ -201,7 +211,12 @@ async fn validate_pr(
     let sprint_regex = Regex::new(r"^(S|s)print \d+$").unwrap();
     let sprint_section = title_sections[3].trim();
     if !sprint_regex.is_match(sprint_section) {
-        return Ok(ValidationResult::BadTitleFormat { reason: format!("Sprint part ({}) doesn't match expected format (example: 'Sprint 2', without quotes)", sprint_section) });
+        return Ok(ValidationResult::BadTitleFormat {
+            reason: format!(
+                "Sprint part ({}) doesn't match expected format (example: 'Sprint 2', without quotes)",
+                sprint_section
+            ),
+        });
     }
 
     if pr_in_question.title.to_ascii_uppercase() == pr_in_question.title {

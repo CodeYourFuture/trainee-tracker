@@ -7,9 +7,9 @@ use sheets::types::{CellData, GridData};
 use tracing::warn;
 
 use crate::{
-    newtypes::new_case_insensitive_email_address,
-    sheets::{cell_string, SheetsClient},
     Error,
+    newtypes::new_case_insensitive_email_address,
+    sheets::{SheetsClient, cell_string},
 };
 
 #[derive(Debug)]

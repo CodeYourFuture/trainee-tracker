@@ -5,15 +5,15 @@ use std::{
 };
 
 use crate::{
+    Error,
     config::CourseScheduleWithRegisterSheetId,
-    github_accounts::{get_trainees, Trainee},
-    mentoring::{get_mentoring_records, MentoringRecord},
+    github_accounts::{Trainee, get_trainees},
+    mentoring::{MentoringRecord, get_mentoring_records},
     newtypes::{GithubLogin, Region},
     octocrab::all_pages,
-    prs::{get_prs, Pr, PrState},
-    register::{get_register, Register},
+    prs::{Pr, PrState, get_prs},
+    register::{Register, get_register},
     sheets::SheetsClient,
-    Error,
 };
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
@@ -23,8 +23,8 @@ use futures::future::join_all;
 use indexmap::{IndexMap, IndexSet};
 use maplit::btreemap;
 use octocrab::{
-    models::{issues::Issue, teams::RequestedTeam, Author},
     Octocrab,
+    models::{Author, issues::Issue, teams::RequestedTeam},
 };
 use regex::Regex;
 use serde::Serialize;
@@ -165,7 +165,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
                     return Err(Error::UserFacing(format!(
                         "Failed to parse issue {} - sprint label wasn't (non-zero) number: {}",
                         html_url, label.name
-                    )))
+                    )));
                 }
             }
         }
@@ -901,7 +901,10 @@ pub fn match_prs_to_assignments(
                     let number = usize::from_str(number_str)
                         .with_context(|| format!("Failed to parse '{}' as number", number_str))?;
                     if number == 0 || number > 20 {
-                        return Err(Error::Fatal(anyhow::anyhow!("Sprint number was impractical - expected something between 1 and 20 but was {}", number)));
+                        return Err(Error::Fatal(anyhow::anyhow!(
+                            "Sprint number was impractical - expected something between 1 and 20 but was {}",
+                            number
+                        )));
                     }
 
                     sprint_index = Some(number - 1);

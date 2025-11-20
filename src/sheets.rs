@@ -4,8 +4,8 @@ use sheets::{spreadsheets::Spreadsheets, types::CellData};
 use tower_sessions::Session;
 
 use crate::{
-    google_auth::{make_redirect_uri, redirect_endpoint, GoogleScope},
     Error, ServerState,
+    google_auth::{GoogleScope, make_redirect_uri, redirect_endpoint},
 };
 
 pub(crate) fn cell_string(cell: &CellData) -> String {
@@ -46,7 +46,7 @@ pub(crate) async fn sheets_client(
                 return Err(Error::UserFacing(format!(
                     "Invalid {} header: {}",
                     AUTHORIZATION_HEADER, e
-                )))
+                )));
             }
         };
         token

@@ -4,16 +4,16 @@ use anyhow::Context;
 use email_address::EmailAddress;
 use futures::future::join_all;
 use gsuite_api::{
-    types::{Group, Member},
     Client, Response,
+    types::{Group, Member},
 };
 use http::Uri;
 use tower_sessions::Session;
 
 use crate::{
-    google_auth::{make_redirect_uri, redirect_endpoint, GoogleScope},
-    newtypes::new_case_insensitive_email_address,
     Error, ServerState,
+    google_auth::{GoogleScope, make_redirect_uri, redirect_endpoint},
+    newtypes::new_case_insensitive_email_address,
 };
 
 pub async fn groups_client(
