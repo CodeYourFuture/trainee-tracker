@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, btree_map::Entry};
 
 use anyhow::Context;
 use chrono::{NaiveDate, Utc};
+use google_sheets4::api::CellData;
 use serde::Serialize;
-use sheets::types::GridData;
 use tracing::warn;
 
 use crate::{
@@ -44,54 +44,48 @@ pub async fn get_mentoring_records(
         records: BTreeMap::new(),
     };
 
-    for sheet_data in sheet_data {
-        if sheet_data.start_column != 0 || sheet_data.start_row != 0 {
-            return Err(Error::Fatal(anyhow::anyhow!(
-                "Start column and row were {} and {}, expected 0 and 0",
-                sheet_data.start_column,
-                sheet_data.start_row
-            )));
+    for (row_number, cells) in sheet_data.into_iter().enumerate() {
+        if cells.is_empty() {
+            continue;
         }
-
-        for (row_number, row) in sheet_data.row_data.into_iter().enumerate() {
-            let cells = row.values;
-            if cells.is_empty() {
-                continue;
+        if cells.len() < 6 && !cell_string(&cells[0]).is_empty() {
+            warn!(
+                "Parsing mentoring data from Google Sheet with ID {}: Not enough columns for row {} - expected at least 6, got {} containing: {}",
+                mentoring_records_sheet_id,
+                row_number,
+                cells.len(),
+                format!("{:#?}", cells),
+            );
+            continue;
+        }
+        if row_number == 0 {
+            let headings = cells.iter().take(6).map(cell_string).collect::<Vec<_>>();
+            if headings != ["Name", "Region", "Date", "Staff", "Status", "Notes"] {
+                return Err(Error::Fatal(anyhow::anyhow!(
+                    "Mentoring data sheet contained wrong headings: {}",
+                    headings.join(", ")
+                )));
             }
-            if cells.len() < 6 && !cell_string(&cells[0]).is_empty() {
-                warn!(
-                    "Parsing mentoring data from Google Sheet with ID {}: Not enough columns for row {} - expected at least 6, got {} containing: {}",
-                    mentoring_records_sheet_id,
-                    row_number,
-                    cells.len(),
-                    format!("{:#?}", cells),
-                );
-                continue;
+        } else {
+            if cells[0].effective_value.is_none() {
+                break;
             }
-            if row_number == 0 {
-                let headings = cells.iter().take(6).map(cell_string).collect::<Vec<_>>();
-                if headings != ["Name", "Region", "Date", "Staff", "Status", "Notes"] {
-                    return Err(Error::Fatal(anyhow::anyhow!(
-                        "Mentoring data sheet contained wrong headings: {}",
-                        headings.join(", ")
-                    )));
+            let name = cell_string(&cells[0]);
+            let date = cell_date(&cells[2]).with_context(|| {
+                format!(
+                    "Failed to parse date from row {} in sheet ID {}",
+                    row_number + 1,
+                    mentoring_records_sheet_id
+                )
+            })?;
+            let entry = mentoring_records.records.entry(name);
+            match entry {
+                Entry::Vacant(entry) => {
+                    entry.insert(MentoringRecord { last_date: date });
                 }
-            } else {
-                if cells[0].effective_value.is_none() {
-                    break;
-                }
-                let name = cell_string(&cells[0]);
-                let date = cell_date(&cells[2])
-                    .with_context(|| format!("Failed to parse date from row {}", row_number + 1))?;
-                let entry = mentoring_records.records.entry(name);
-                match entry {
-                    Entry::Vacant(entry) => {
+                Entry::Occupied(mut entry) => {
+                    if entry.get().last_date < date {
                         entry.insert(MentoringRecord { last_date: date });
-                    }
-                    Entry::Occupied(mut entry) => {
-                        if entry.get().last_date < date {
-                            entry.insert(MentoringRecord { last_date: date });
-                        }
                     }
                 }
             }
@@ -103,9 +97,10 @@ pub async fn get_mentoring_records(
 async fn get_mentoring_records_grid_data(
     client: SheetsClient,
     mentoring_records_sheet_id: &str,
-) -> Result<Vec<GridData>, Error> {
-    let data_result = client.get(mentoring_records_sheet_id, true, &[]).await;
-    let data = match data_result {
+) -> Result<Vec<Vec<CellData>>, Error> {
+    let expected_sheet_title = "Feedback";
+    let data_result = client.get(mentoring_records_sheet_id).await;
+    let mut data = match data_result {
         Ok(data) => data,
         Err(Error::PotentiallyIgnorablePermissions(_)) => {
             return Ok(Vec::new());
@@ -120,24 +115,12 @@ async fn get_mentoring_records_grid_data(
             return Err(err);
         }
     };
-    let expected_sheet_title = "Feedback";
-    let sheet = data
-        .body
-        .sheets
-        .into_iter()
-        .find(|sheet| {
-            sheet
-                .properties
-                .as_ref()
-                .map(|properties| properties.title.as_str())
-                == Some(expected_sheet_title)
-        })
-        .ok_or_else(|| {
-            Error::Fatal(anyhow::anyhow!(
-                "Couldn't find sheet '{}' in spreadsheet with ID {}",
-                expected_sheet_title,
-                mentoring_records_sheet_id
-            ))
-        })?;
-    Ok(sheet.data)
+    let sheet = data.remove(expected_sheet_title).ok_or_else(|| {
+        Error::Fatal(anyhow::anyhow!(
+            "Couldn't find sheet '{}' in spreadsheet with ID {}",
+            expected_sheet_title,
+            mentoring_records_sheet_id
+        ))
+    })?;
+    Ok(sheet.rows)
 }

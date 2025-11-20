@@ -6,7 +6,6 @@ use axum::{
 };
 use http::Uri;
 use serde::Deserialize;
-use sheets::Client;
 use tower_sessions::Session;
 use uuid::Uuid;
 
@@ -112,7 +111,8 @@ pub async fn handle_google_oauth_callback(
         server_state.config.public_base_url
     );
 
-    let mut client = Client::new(
+    // TODO: Replace this with some other way of getting the token (either a request ourselves, or using another library) so we can drop the sheets dep.
+    let mut client = ::sheets::Client::new(
         server_state.config.google_apis_client_id.clone(),
         (*server_state.config.google_apis_client_secret).clone(),
         redirect_uri,

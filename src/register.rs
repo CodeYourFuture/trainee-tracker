@@ -1,9 +1,9 @@
 use anyhow::Context;
 use chrono::{DateTime, NaiveDate, Utc};
 use email_address::EmailAddress;
+use google_sheets4::api::CellData;
 use indexmap::IndexMap;
 use serde::Serialize;
-use sheets::types::{CellData, GridData};
 use tracing::warn;
 
 use crate::{
@@ -61,124 +61,100 @@ pub(crate) async fn get_register(
 ) -> Result<Register, Error> {
     let mut modules: IndexMap<String, ModuleAttendance> = IndexMap::new();
 
-    let data = client
-        .get(&register_sheet_id, true, &[])
-        .await
-        .map_err(|err| {
-            err.with_context(|| format!("Failed to get spreadsheet with ID {}", register_sheet_id))
-        })?;
-    for sheet in data.body.sheets {
-        if let Some(properties) = &sheet.properties {
-            let title = properties.title.clone();
-            if modules.contains_key(&title) {
-                return Err(Error::Fatal(anyhow::anyhow!(
-                    "Failed to read register sheet ID {} - duplicate sheets {}",
-                    register_sheet_id,
-                    title
-                )));
-            }
-            let register_url = format!(
-                "{}{}gid={}",
-                data.body.spreadsheet_url,
-                if data.body.spreadsheet_url.contains("?") {
-                    "&"
-                } else {
-                    "?"
-                },
-                properties.sheet_id
-            );
-            let attendance = read_module(sheet.data, register_url.clone(), start_date, end_date)
-                .with_context(|| {
-                    format!(
-                        "Failed to read register sheet ID {} sheet {}",
-                        register_sheet_id, title
-                    )
-                })?;
-            let module = ModuleAttendance {
-                register_url,
-                attendance,
-            };
-            // TODO: Unify module names across sources (repo has Module-prefix, register does not)
-            modules.insert(format!("Module-{}", title.replace(' ', "-")), module);
-        } else {
-            warn!("Ignoring sheet in {} with no properties", register_sheet_id);
+    let data = client.get(&register_sheet_id).await.map_err(|err| {
+        err.with_context(|| format!("Failed to get spreadsheet with ID {}", register_sheet_id))
+    })?;
+    for (title, sheet) in data.into_iter() {
+        if modules.contains_key(&title) {
+            return Err(Error::Fatal(anyhow::anyhow!(
+                "Failed to read register sheet ID {} - duplicate sheets {}",
+                register_sheet_id,
+                title
+            )));
         }
+        let register_url = format!(
+            "{}{}gid={}",
+            sheet.url,
+            if sheet.url.contains("?") { "&" } else { "?" },
+            sheet.id
+        );
+        let attendance = read_module(sheet.rows, register_url.clone(), start_date, end_date)
+            .with_context(|| {
+                format!(
+                    "Failed to read register sheet ID {} sheet {}",
+                    register_sheet_id, title
+                )
+            })?;
+        let module = ModuleAttendance {
+            register_url,
+            attendance,
+        };
+        // TODO: Unify module names across sources (repo has Module-prefix, register does not)
+        modules.insert(format!("Module-{}", title.replace(' ', "-")), module);
     }
     Ok(Register { modules })
 }
 
 fn read_module(
-    sheet_data: Vec<GridData>,
+    sheet_data: Vec<Vec<CellData>>,
     register_url: String,
     start_date: NaiveDate,
     end_date: NaiveDate,
 ) -> Result<Vec<IndexMap<EmailAddress, Attendance>>, anyhow::Error> {
     let mut sprints = Vec::new();
-    'sheet: for data in sheet_data {
-        if data.start_column != 0 || data.start_row != 0 {
+    for (row_number, cells) in sheet_data.into_iter().enumerate() {
+        // Some sheets have documentation or pivot table
+        if row_number == 0 && !cells.is_empty() && cell_string(&cells[0]) != "Name" {
+            continue;
+        }
+        if cells.len() < 7 {
             return Err(anyhow::anyhow!(
-                "Start column and row were {} and {}, expected 0 and 0",
-                data.start_column,
-                data.start_row
+                "Not enough columns for row {} - expected at least 7, got {} containing: {}",
+                row_number,
+                cells.len(),
+                format!("{:#?}", cells),
             ));
         }
-        for (row_number, row) in data.row_data.into_iter().enumerate() {
-            let cells = row.values;
-            // Some sheets have documentation or pivot table
-            if row_number == 0 && !cells.is_empty() && cell_string(&cells[0]) != "Name" {
-                continue 'sheet;
-            }
-            if cells.len() < 7 {
+        if row_number == 0 {
+            let headings = cells.iter().take(7).map(cell_string).collect::<Vec<_>>();
+            if headings
+                != [
+                    "Name",
+                    "Email",
+                    "Timestamp",
+                    "Course",
+                    "Module",
+                    "Day",
+                    "Location",
+                ]
+            {
                 return Err(anyhow::anyhow!(
-                    "Not enough columns for row {} - expected at least 7, got {} containing: {}",
-                    row_number,
-                    cells.len(),
-                    format!("{:#?}", cells),
+                    "Register sheet contained wrong headings: {}",
+                    headings.join(", ")
                 ));
             }
-            if row_number == 0 {
-                let headings = cells.iter().take(7).map(cell_string).collect::<Vec<_>>();
-                if headings
-                    != [
-                        "Name",
-                        "Email",
-                        "Timestamp",
-                        "Course",
-                        "Module",
-                        "Day",
-                        "Location",
-                    ]
-                {
-                    return Err(anyhow::anyhow!(
-                        "Register sheet contained wrong headings: {}",
-                        headings.join(", ")
-                    ));
-                }
+        } else {
+            if cells[0].effective_value.is_none() {
+                break;
+            }
+            let (sprint_number, attendance) = read_row(&cells, register_url.clone())
+                .with_context(|| format!("Failed to read attendance from row {}", row_number))?;
+            if attendance.timestamp.date_naive() <= start_date
+                || attendance.timestamp.date_naive() >= end_date
+            {
+                continue;
+            }
+            let sprint_index = sprint_number - 1;
+            while sprints.len() < sprint_number {
+                sprints.push(IndexMap::new());
+            }
+            if sprints[sprint_index].contains_key(&attendance.email) {
+                warn!(
+                    "Register sheet contained duplicate entry for sprint {} trainee {}",
+                    sprint_number, attendance.email
+                );
             } else {
-                if cells[0].effective_value.is_none() {
-                    break;
-                }
-                let (sprint_number, attendance) = read_row(&cells, register_url.clone())
-                    .with_context(|| {
-                        format!("Failed to read attendance from row {}", row_number)
-                    })?;
-                if attendance.timestamp.date_naive() <= start_date
-                    || attendance.timestamp.date_naive() >= end_date
-                {
-                    continue;
-                }
-                let sprint_index = sprint_number - 1;
-                while sprints.len() < sprint_number {
-                    sprints.push(IndexMap::new());
-                }
-                if sprints[sprint_index].contains_key(&attendance.email) {
-                    warn!(
-                        "Register sheet contained duplicate entry for sprint {} trainee {}",
-                        sprint_number, attendance.email
-                    );
-                } else {
-                    sprints[sprint_index].insert(attendance.email.clone(), attendance);
-                }
+                sprints[sprint_index].insert(attendance.email.clone(), attendance);
             }
         }
     }
