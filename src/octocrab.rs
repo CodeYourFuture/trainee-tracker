@@ -1,22 +1,22 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use http::{header::USER_AGENT, HeaderValue, Uri};
+use http::{HeaderValue, Uri, header::USER_AGENT};
 use hyper_rustls::HttpsConnectorBuilder;
 use octocrab::{
+    AuthState, Octocrab, OctocrabBuilder,
     service::middleware::{
         auth_header::AuthHeaderLayer, base_uri::BaseUriLayer, extra_headers::ExtraHeadersLayer,
         retry::RetryConfig,
     },
-    AuthState, Octocrab, OctocrabBuilder,
 };
 use serde::de::DeserializeOwned;
 use tower::retry::RetryLayer;
 use tower_sessions::Session;
 
 use crate::{
-    auth::{github_auth_redirect_url, GITHUB_ACCESS_TOKEN_SESSION_KEY},
     Error, ServerState,
+    auth::{GITHUB_ACCESS_TOKEN_SESSION_KEY, github_auth_redirect_url},
 };
 
 pub(crate) async fn octocrab(

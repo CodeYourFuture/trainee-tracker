@@ -7,23 +7,23 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use futures::future::join_all;
-use http::{header::CONTENT_TYPE, HeaderMap, StatusCode, Uri};
+use http::{HeaderMap, StatusCode, Uri, header::CONTENT_TYPE};
 use serde::Deserialize;
 use tower_sessions::Session;
 
 use crate::{
+    Error, ServerState,
     config::CourseScheduleWithRegisterSheetId,
     course::{
-        fetch_batch_metadata, get_batch_with_submissions, Attendance, Batch, BatchMetadata, Course,
-        Submission, TraineeStatus,
+        Attendance, Batch, BatchMetadata, Course, Submission, TraineeStatus, fetch_batch_metadata,
+        get_batch_with_submissions,
     },
-    google_groups::{get_groups, groups_client, GoogleGroup},
+    google_groups::{GoogleGroup, get_groups, groups_client},
     octocrab::octocrab,
     prs::{MaybeReviewerStaffOnlyDetails, PrState, ReviewerInfo},
     reviewer_staff_info::get_reviewer_staff_info,
     sheets::sheets_client,
     slack::list_groups_with_members,
-    Error, ServerState,
 };
 
 pub async fn list_courses(

@@ -3,14 +3,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::Context;
 use chrono::{DateTime, TimeDelta};
 use futures::future::join_all;
+use octocrab::Octocrab;
 use octocrab::models::pulls::{Comment, PullRequest, Review as OctoReview};
 use octocrab::models::{Author, IssueState};
 use octocrab::params::State;
-use octocrab::Octocrab;
 use serde::Serialize;
 
-use crate::newtypes::GithubLogin;
 use crate::Error;
+use crate::newtypes::GithubLogin;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Pr {

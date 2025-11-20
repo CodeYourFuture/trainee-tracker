@@ -1,4 +1,4 @@
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::{BTreeMap, btree_map::Entry};
 
 use anyhow::Context;
 use chrono::{NaiveDate, Utc};
@@ -7,8 +7,8 @@ use sheets::types::GridData;
 use tracing::warn;
 
 use crate::{
-    sheets::{cell_date, cell_string, SheetsClient},
     Error,
+    sheets::{SheetsClient, cell_date, cell_string},
 };
 
 pub struct MentoringRecords {

@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use sheets::types::Sheet;
 
 use crate::{
-    newtypes::{new_case_insensitive_email_address, GithubLogin, Region},
-    sheets::{cell_string, SheetsClient},
     Error,
+    newtypes::{GithubLogin, Region, new_case_insensitive_email_address},
+    sheets::{SheetsClient, cell_string},
 };
 
 // TODO: Replace this with a serde implementation from a Google Sheet.
@@ -67,7 +67,11 @@ fn trainees_from_sheet(sheet: &Sheet) -> Result<BTreeMap<GithubLogin, Trainee>, 
     let mut trainees = BTreeMap::new();
     for data in &sheet.data {
         if data.start_column != 0 || data.start_row != 0 {
-            return Err(Error::Fatal(anyhow::anyhow!("Reading data from Google Sheets API - got data chunk that didn't start at row=0,column=0 - got row={},column={}", data.start_row, data.start_column)));
+            return Err(Error::Fatal(anyhow::anyhow!(
+                "Reading data from Google Sheets API - got data chunk that didn't start at row=0,column=0 - got row={},column={}",
+                data.start_row,
+                data.start_column
+            )));
         }
         for (row_index, row) in data.row_data.iter().enumerate() {
             if row_index == 0 {
@@ -75,7 +79,10 @@ fn trainees_from_sheet(sheet: &Sheet) -> Result<BTreeMap<GithubLogin, Trainee>, 
             }
             let cells = &row.values;
             if cells.len() < 5 {
-                return Err(Error::Fatal(anyhow::anyhow!("Reading trainee data from Google Sheets API, row {} didn't have at least 5 columns", row_index)));
+                return Err(Error::Fatal(anyhow::anyhow!(
+                    "Reading trainee data from Google Sheets API, row {} didn't have at least 5 columns",
+                    row_index
+                )));
             }
 
             let github_login = GithubLogin::from(cell_string(&cells[3]));

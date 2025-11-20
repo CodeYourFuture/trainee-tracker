@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use askama::Template;
 use axum::{
     extract::{Query, State},
@@ -11,8 +11,8 @@ use tower_sessions::Session;
 use uuid::Uuid;
 
 use crate::{
-    slack::{make_slack_redirect_uri, SLACK_ACCESS_TOKEN_SESSION_KEY},
     Config, Error, ServerState,
+    slack::{SLACK_ACCESS_TOKEN_SESSION_KEY, make_slack_redirect_uri},
 };
 
 #[derive(Deserialize)]
@@ -56,7 +56,10 @@ pub(crate) async fn github_auth_redirect_url(
     original_uri: Uri,
 ) -> Result<Uri, Error> {
     let uuid = Uuid::new_v4();
-    let redirect_url = format!("https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}/api/oauth-callbacks/github&scope=read:user%20read:org&state={}", server_state.config.github_client_id, server_state.config.public_base_url, uuid);
+    let redirect_url = format!(
+        "https://github.com/login/oauth/authorize?client_id={}&redirect_uri={}/api/oauth-callbacks/github&scope=read:user%20read:org&state={}",
+        server_state.config.github_client_id, server_state.config.public_base_url, uuid
+    );
     server_state
         .github_auth_state_cache
         .insert(uuid, original_uri)
@@ -93,14 +96,15 @@ pub async fn handle_google_oauth_callback(
     session: Session,
     params: Query<OauthCallbackParams>,
 ) -> Result<Html<String>, Error> {
-    let auth_state = if let Some(auth_state) = server_state
+    let auth_state = match server_state
         .google_auth_state_cache
         .remove(&params.state)
         .await
     {
-        auth_state
-    } else {
-        return Err(Error::Fatal(anyhow!("Unrecognised state")));
+        Some(auth_state) => auth_state,
+        None => {
+            return Err(Error::Fatal(anyhow!("Unrecognised state")));
+        }
     };
 
     let redirect_uri = format!(

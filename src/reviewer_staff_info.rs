@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use sheets::types::Sheet;
 
 use crate::{
+    Error,
     newtypes::GithubLogin,
     prs::{CheckStatus, ReviewerStaffOnlyDetails},
-    sheets::{cell_bool, cell_string, SheetsClient},
-    Error,
+    sheets::{SheetsClient, cell_bool, cell_string},
 };
 
 pub(crate) async fn get_reviewer_staff_info(
@@ -58,7 +58,11 @@ fn reviewer_staff_detail_from_sheet(
     let mut reviewers = BTreeMap::new();
     for data in &sheet.data {
         if data.start_column != 0 || data.start_row != 0 {
-            return Err(Error::Fatal(anyhow::anyhow!("Reading data from Google Sheets API - got data chunk that didn't start at row=0,column=0 - got row={},column={}", data.start_row, data.start_column)));
+            return Err(Error::Fatal(anyhow::anyhow!(
+                "Reading data from Google Sheets API - got data chunk that didn't start at row=0,column=0 - got row={},column={}",
+                data.start_row,
+                data.start_column
+            )));
         }
         for (row_index, row) in data.row_data.iter().enumerate() {
             if row_index == 0 {

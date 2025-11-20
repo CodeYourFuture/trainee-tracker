@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 
-use ::octocrab::models::{teams::RequestedTeam, Author};
+use ::octocrab::models::{Author, teams::RequestedTeam};
 use anyhow::Context;
 use axum::{
+    Json,
     extract::{OriginalUri, Path, State},
     response::IntoResponse,
-    Json,
 };
 use futures::future::join_all;
 use http::HeaderMap;
@@ -14,13 +14,13 @@ use serde::Serialize;
 use tower_sessions::Session;
 
 use crate::{
+    Error, ServerState,
     github_accounts::get_trainees,
     newtypes::GithubLogin,
     octocrab::{all_pages, octocrab},
-    prs::{fill_in_reviewers, get_prs, PrWithReviews},
-    register::{get_register, Attendance},
+    prs::{PrWithReviews, fill_in_reviewers, get_prs},
+    register::{Attendance, get_register},
     sheets::sheets_client,
-    Error, ServerState,
 };
 
 pub async fn health_check() -> impl IntoResponse {
