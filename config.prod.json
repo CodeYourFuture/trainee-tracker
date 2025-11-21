@@ -271,7 +271,8 @@
               {
                 "London": "2025-03-22",
                 "West Midlands": "2025-03-22"
-              }
+              },
+              {}
             ],
             "Module-Logic": [
               {
@@ -343,7 +344,8 @@
                 "Glasgow": "2025-08-02",
                 "South Africa": "2025-08-02",
                 "West Midlands": "2025-08-02"
-              }
+              },
+              {}
             ],
             "Module-Logic": [
               {
