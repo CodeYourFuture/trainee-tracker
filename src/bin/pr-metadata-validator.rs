@@ -84,6 +84,7 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
+        ValidationResult::WrongFileCount => WRONG_FILE_COUNT,
     };
 
     let full_message = format!(
@@ -138,12 +139,17 @@ const UNKNOWN_REGION_COMMENT: &str = r#"Your PR's title didn't contain a known r
 
 Please check the expected title format, and make sure your region is in the correct place and spelled correctly."#;
 
+const WRONG_FILE_COUNT: &str = r#"The changed files in this PR don't match what is expected for this task.
+
+Please check that you committed the right files for the task, and that there are no accidentally committed files from other sprints."#;
+
 enum ValidationResult {
     Ok,
     BodyTemplateNotFilledOut,
     CouldNotMatch,
     BadTitleFormat { reason: String },
     UnknownRegion,
+    WrongFileCount
 }
 
 async fn validate_pr(
@@ -233,6 +239,18 @@ async fn validate_pr(
     {
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
+
+
+    // get unique descriptor of the task solved in this PR
+    let example_max_changes_count = 1;
+    println!("{}", pr_in_question.changed_files);
+    if pr_in_question.changed_files > example_max_changes_count {
+        return Ok(ValidationResult::WrongFileCount);
+    }
+    // get list of expected changed files for this task
+    // if this pr has specific expected changes,
+        // get list of changed files for this pr
+        // make sure they match
 
     Ok(ValidationResult::Ok)
 }
