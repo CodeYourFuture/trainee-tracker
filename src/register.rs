@@ -105,7 +105,7 @@ fn read_module(
     for (row_number, cells) in sheet_data.into_iter().enumerate() {
         // Some sheets have documentation or pivot table
         if row_number == 0 && !cells.is_empty() && cell_string(&cells[0]) != "Name" {
-            continue;
+            return Ok(sprints);
         }
         if cells.len() < 7 {
             return Err(anyhow::anyhow!(
