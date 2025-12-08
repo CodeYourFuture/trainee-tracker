@@ -240,22 +240,57 @@ async fn validate_pr(
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
-    // get all of the metadata here
-    let mut pr_files = match octocrab
-        .pulls(github_org_name, module_name)
-        .list_files(pr_number)
+    match check_pr_file_changes(octocrab, github_org_name, module_name, pr_number)
         .await {
-            Ok(p) => p.into_iter(),
-            Err(_) => return Ok(ValidationResult::WrongFiles) // todo probably needs a separate error condition.
-        };
-    let re_for_pr = Regex::new(r"^Sprint-1/1-key-exercises").unwrap();
-    while let Some(pr_file) = pr_files.next() {
-        if !re_for_pr.is_match(&pr_file.filename) {
-            return Ok(ValidationResult::WrongFiles)
+            Some(result) => return Ok(result),
+            None => ()
         }
-    }
 
     Ok(ValidationResult::Ok)
+}
+
+// Check the changed files in a pull request match what is expected for that sprint task
+async fn check_pr_file_changes(
+    octocrab: &Octocrab,
+    github_org_name: &str,
+    module_name: &str,
+    pr_number: u64,
+) -> Option<ValidationResult> {
+    // Get the Sprint Task's description of expected changes
+    let task_issue = match octocrab
+        .issues(github_org_name, module_name)
+        .get(35) // TODO get the correct one,just default to this for testing now
+        .await {
+            Ok(iss) => iss,
+            Err(_) => return Some(ValidationResult::CouldNotMatch) // Failed to find the right task
+        };
+    let task_issue_body = match task_issue.body {
+        Some(body) => body,
+        None => return None // Task is empty, nothing left to check
+    };
+    let directory_description = Regex::new("CHANGE_DIR=(.+)\\n").unwrap();
+    let directory_description_regex = match directory_description.captures(&task_issue_body) {
+        Some(capts) => capts.get(0).unwrap().as_str(), // Only allows a single directory for now
+        None => return None // There is no match defined for this task, don't do any more checks
+    };
+    let directory_matcher = match Regex::new(directory_description_regex) {
+        Ok(regex) => regex,
+        Err(_) => return Some(ValidationResult::WrongFiles) // The regex is not valid. Return an error so the curriculum owner can address this
+    };
+    // Get all of the changed files and check them
+    let mut pr_files = match octocrab
+        .pulls(github_org_name, module_name)
+        .list_files(pr_number) // TODO make sure this works across pages (+20 changed files? are there any tasks that meet this condition? is that an auto-fail?)
+        .await {
+            Ok(page) => page.into_iter(),
+            Err(_) => return Some(ValidationResult::WrongFiles) // TODO probably needs a separate error condition.
+        };
+    while let Some(pr_file) = pr_files.next() {
+        if !directory_matcher.is_match(&pr_file.filename) {
+            return Some(ValidationResult::WrongFiles)
+        }
+    }
+    return None;
 }
 
 struct KnownRegions(BTreeMap<&'static str, Vec<&'static str>>);
