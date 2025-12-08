@@ -23,8 +23,7 @@ pub struct Pr {
     pub state: PrState,
     pub updated_at: DateTime<chrono::Utc>,
     pub is_closed: bool,
-    pub labels: BTreeSet<String>,
-    pub changed_files: u64,
+    pub labels: BTreeSet<String>
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -94,7 +93,6 @@ pub async fn get_prs(
                  title,
                  state,
                  body,
-                 changed_files,
                  ..
              }| {
                 // If a user is deleted from GitHub, their User will be None - ignore PRs from deleted users.
@@ -121,10 +119,6 @@ pub async fn get_prs(
                 let url = html_url?.to_string();
                 let title = title?;
                 let body = body.unwrap_or_default();
-                let changed_files = match changed_files {
-                    Some(changes) => changes,
-                    None => 99999
-                };
 
                 Some(Pr {
                     number,
@@ -136,8 +130,7 @@ pub async fn get_prs(
                     title,
                     body,
                     is_closed,
-                    labels,
-                    changed_files
+                    labels
                 })
             },
         )

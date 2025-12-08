@@ -84,7 +84,7 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
-        ValidationResult::WrongFileCount => WRONG_FILE_COUNT,
+        ValidationResult::WrongFiles => WRONG_FILES,
     };
 
     let full_message = format!(
@@ -139,7 +139,7 @@ const UNKNOWN_REGION_COMMENT: &str = r#"Your PR's title didn't contain a known r
 
 Please check the expected title format, and make sure your region is in the correct place and spelled correctly."#;
 
-const WRONG_FILE_COUNT: &str = r#"The changed files in this PR don't match what is expected for this task.
+const WRONG_FILES: &str = r#"The changed files in this PR don't match what is expected for this task.
 
 Please check that you committed the right files for the task, and that there are no accidentally committed files from other sprints."#;
 
@@ -149,7 +149,7 @@ enum ValidationResult {
     CouldNotMatch,
     BadTitleFormat { reason: String },
     UnknownRegion,
-    WrongFileCount
+    WrongFiles
 }
 
 async fn validate_pr(
@@ -240,17 +240,20 @@ async fn validate_pr(
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
-
-    // get unique descriptor of the task solved in this PR
-    let example_max_changes_count = 1;
-    println!("{}", pr_in_question.changed_files);
-    if pr_in_question.changed_files > example_max_changes_count {
-        return Ok(ValidationResult::WrongFileCount);
+    // get all of the metadata here
+    let mut pr_files = match octocrab
+        .pulls(github_org_name, module_name)
+        .list_files(pr_number)
+        .await {
+            Ok(p) => p.into_iter(),
+            Err(_) => return Ok(ValidationResult::WrongFiles) // todo probably needs a separate error condition.
+        };
+    let re_for_pr = Regex::new(r"^Sprint-1/1-key-exercises").unwrap();
+    while let Some(pr_file) = pr_files.next() {
+        if !re_for_pr.is_match(&pr_file.filename) {
+            return Ok(ValidationResult::WrongFiles)
+        }
     }
-    // get list of expected changed files for this task
-    // if this pr has specific expected changes,
-        // get list of changed files for this pr
-        // make sure they match
 
     Ok(ValidationResult::Ok)
 }
