@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, process::exit};
 
+use anyhow::{anyhow, Context};
 use chrono::NaiveDate;
 use indexmap::IndexMap;
 use maplit::btreemap;
@@ -172,7 +173,7 @@ async fn validate_pr(
         .iter()
         .find(|pr| pr.number == pr_number)
         .ok_or_else(|| {
-            anyhow::anyhow!(
+            anyhow!(
                 "Failed to find PR {} in list of PRs for module {}",
                 pr_number,
                 module_name
@@ -240,10 +241,11 @@ async fn validate_pr(
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
-    match check_pr_file_changes(octocrab, github_org_name, module_name, pr_number)
+    match check_pr_file_changes(octocrab, github_org_name, module_name, pr_number, 35) // TODO get the correct one,just default to this for testing now
         .await {
-            Some(result) => return Ok(result),
-            None => ()
+            Ok(Some(problem)) => return Ok(problem),
+            Ok(None) => (),
+            Err(e) => { let _ = anyhow!(e); }
         }
 
     Ok(ValidationResult::Ok)
@@ -252,45 +254,57 @@ async fn validate_pr(
 // Check the changed files in a pull request match what is expected for that sprint task
 async fn check_pr_file_changes(
     octocrab: &Octocrab,
-    github_org_name: &str,
+    org_name: &str,
     module_name: &str,
     pr_number: u64,
-) -> Option<ValidationResult> {
+    task_issue_number: u64,
+) -> Result<Option<ValidationResult>, Error> {
     // Get the Sprint Task's description of expected changes
     let task_issue = match octocrab
-        .issues(github_org_name, module_name)
-        .get(35) // TODO get the correct one,just default to this for testing now
+        .issues(org_name, module_name)
+        .get(task_issue_number)
         .await {
             Ok(iss) => iss,
-            Err(_) => return Some(ValidationResult::CouldNotMatch) // Failed to find the right task
+            Err(_) => return Ok(Some(ValidationResult::CouldNotMatch)) // Failed to find the right task
         };
     let task_issue_body = match task_issue.body {
         Some(body) => body,
-        None => return None // Task is empty, nothing left to check
+        None => return Ok(None) // Task is empty, nothing left to check
     };
     let directory_description = Regex::new("CHANGE_DIR=(.+)\\n").unwrap();
     let directory_description_regex = match directory_description.captures(&task_issue_body) {
-        Some(capts) => capts.get(0).unwrap().as_str(), // Only allows a single directory for now
-        None => return None // There is no match defined for this task, don't do any more checks
+        Some(capts) => capts.get(1).unwrap().as_str(), // Only allows a single directory for now
+        None => return Ok(None) // There is no match defined for this task, don't do any more checks
     };
-    let directory_matcher = match Regex::new(directory_description_regex) {
-        Ok(regex) => regex,
-        Err(_) => return Some(ValidationResult::WrongFiles) // The regex is not valid. Return an error so the curriculum owner can address this
-    };
-    // Get all of the changed files and check them
-    let mut pr_files = match octocrab
-        .pulls(github_org_name, module_name)
-        .list_files(pr_number) // TODO make sure this works across pages (+20 changed files? are there any tasks that meet this condition? is that an auto-fail?)
-        .await {
-            Ok(page) => page.into_iter(),
-            Err(_) => return Some(ValidationResult::WrongFiles) // TODO probably needs a separate error condition.
-        };
+    let directory_matcher = Regex::new(directory_description_regex)
+        .context("Invalid regex for task directory match")?;
+    // Get all of the changed files
+    let pr_files_pages = octocrab
+        .pulls(org_name, module_name)
+        .list_files(pr_number)
+        .await
+        .context("Failed to get changed files")?;
+    if pr_files_pages.items.len() == 0 {
+        return Ok(Some(ValidationResult::WrongFiles)); // no files committed
+    }
+    let pr_files_all = octocrab
+        .all_pages(pr_files_pages)
+        .await
+        .context("Failed to list all changed files")?;
+    let mut pr_files = pr_files_all
+        .into_iter();
+    let mut i = 0;
+    // check each file and error if one is in unexpected place
+    println!("{}", directory_description_regex);
     while let Some(pr_file) = pr_files.next() {
+        i += 1;
+        println!("{}{}", i, pr_file.filename);
         if !directory_matcher.is_match(&pr_file.filename) {
-            return Some(ValidationResult::WrongFiles)
+            println!("Found bad match");
+            return Ok(Some(ValidationResult::WrongFiles))
         }
     }
-    return None;
+    return Ok(None);
 }
 
 struct KnownRegions(BTreeMap<&'static str, Vec<&'static str>>);
