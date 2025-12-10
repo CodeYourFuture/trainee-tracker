@@ -141,6 +141,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
         labels,
         title,
         html_url,
+        number,
         ..
     } = issue;
 
@@ -227,6 +228,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
             title: title.clone(),
             html_url: html_url.clone(),
             optionality,
+            assignment_descriptor_id: *number
         }),
         "Codility" => {
             // TODO: Handle these.
@@ -311,7 +313,8 @@ pub enum Assignment {
     },
     ExpectedPullRequest {
         title: String,
-        html_url: Url, // TODO convert the task ID here
+        html_url: Url,
+        assignment_descriptor_id: u64,
         optionality: AssignmentOptionality,
     },
 }
@@ -1001,19 +1004,8 @@ fn match_pr_to_assignment(
     }) = best_match
     {
 
-        let assignment_descriptor = assignments[sprint_index].assignments[assignment_index].clone();
-        let pr_assignment_descriptor_id: u64 = match assignment_descriptor {
-            Assignment::ExpectedPullRequest { html_url, .. } => {
-                Regex::new("/(\\d+)$")
-                    .unwrap()
-                    .captures(html_url.path())
-                    .unwrap()
-                    .get(1)
-                    .unwrap()
-                    .as_str()
-                    .parse::<u64>()
-                    .unwrap()
-            },
+        let pr_assignment_descriptor_id: u64 = match assignments[sprint_index].assignments[assignment_index] {
+            Assignment::ExpectedPullRequest { assignment_descriptor_id, .. } => assignment_descriptor_id,
             _ => 0
         };
         submissions[sprint_index].submissions[assignment_index] =
