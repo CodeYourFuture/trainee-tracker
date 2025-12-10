@@ -23,7 +23,7 @@ pub struct Pr {
     pub state: PrState,
     pub updated_at: DateTime<chrono::Utc>,
     pub is_closed: bool,
-    pub labels: BTreeSet<String>
+    pub labels: BTreeSet<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -130,7 +130,7 @@ pub async fn get_prs(
                     title,
                     body,
                     is_closed,
-                    labels
+                    labels,
                 })
             },
         )
