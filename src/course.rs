@@ -1036,7 +1036,7 @@ pub fn get_descriptor_id_for_pr(sprints: Vec<SprintWithSubmissions>, target_pr_n
             _ => false
         }) {
             Some(Submission::PullRequest {assignment_descriptor, ..}) => assignment_descriptor,
-            _ => 0 // TODO once again, we need to handle this error better
+            _ => 0
         }
 }
 
