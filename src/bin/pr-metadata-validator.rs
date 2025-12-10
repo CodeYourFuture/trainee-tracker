@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, process::exit};
 
+use anyhow::{Context, anyhow};
 use chrono::NaiveDate;
 use indexmap::IndexMap;
 use maplit::btreemap;
@@ -8,7 +9,7 @@ use regex::Regex;
 use trainee_tracker::{
     Error,
     config::{CourseSchedule, CourseScheduleWithRegisterSheetId},
-    course::match_prs_to_assignments,
+    course::{get_descriptor_id_for_pr, match_prs_to_assignments},
     newtypes::Region,
     octocrab::octocrab_for_token,
     prs::get_prs,
@@ -84,6 +85,8 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
+        ValidationResult::WrongFiles { files } => &format!("{}{}`", WRONG_FILES, files),
+        ValidationResult::NoFiles => NO_FILES,
     };
 
     let full_message = format!(
@@ -138,12 +141,24 @@ const UNKNOWN_REGION_COMMENT: &str = r#"Your PR's title didn't contain a known r
 
 Please check the expected title format, and make sure your region is in the correct place and spelled correctly."#;
 
+const WRONG_FILES: &str = r#"The changed files in this PR don't match what is expected for this task.
+
+Please check that you committed the right files for the task, and that there are no accidentally committed files from other sprints.
+
+Please review the changed files tab at the top of the page, we are only expecting changes in this directory: `"#;
+
+const NO_FILES: &str = r#"This PR is missing any submitted files.
+
+Please check that you committed the right files and pushed to the repository"#;
+
 enum ValidationResult {
     Ok,
     BodyTemplateNotFilledOut,
     CouldNotMatch,
     BadTitleFormat { reason: String },
     UnknownRegion,
+    WrongFiles { files: String },
+    NoFiles,
 }
 
 async fn validate_pr(
@@ -166,7 +181,7 @@ async fn validate_pr(
         .iter()
         .find(|pr| pr.number == pr_number)
         .ok_or_else(|| {
-            anyhow::anyhow!(
+            anyhow!(
                 "Failed to find PR {} in list of PRs for module {}",
                 pr_number,
                 module_name
@@ -234,7 +249,78 @@ async fn validate_pr(
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
+    let pr_assignment_descriptor_id = get_descriptor_id_for_pr(matched.sprints, pr_number);
+
+    match check_pr_file_changes(
+        octocrab,
+        github_org_name,
+        module_name,
+        pr_number,
+        pr_assignment_descriptor_id,
+    )
+    .await
+    {
+        Ok(Some(problem)) => return Ok(problem),
+        Ok(None) => (),
+        Err(e) => {
+            let _ = anyhow!(e);
+        }
+    }
+
     Ok(ValidationResult::Ok)
+}
+
+// Check the changed files in a pull request match what is expected for that sprint task
+async fn check_pr_file_changes(
+    octocrab: &Octocrab,
+    org_name: &str,
+    module_name: &str,
+    pr_number: u64,
+    task_issue_number: u64,
+) -> Result<Option<ValidationResult>, Error> {
+    // Get the Sprint Task's description of expected changes
+    let task_issue = match octocrab
+        .issues(org_name, module_name)
+        .get(task_issue_number)
+        .await
+    {
+        Ok(iss) => iss,
+        Err(_) => return Ok(Some(ValidationResult::CouldNotMatch)), // Failed to find the right task
+    };
+    let task_issue_body = match task_issue.body {
+        Some(body) => body,
+        None => return Ok(None), // Task is empty, nothing left to check
+    };
+    let directory_description = Regex::new("CHANGE_DIR=(.+)\\n").unwrap();
+    let directory_description_regex = match directory_description.captures(&task_issue_body) {
+        Some(capts) => capts.get(1).unwrap().as_str(), // Only allows a single directory for now
+        None => return Ok(None), // There is no match defined for this task, don't do any more checks
+    };
+    let directory_matcher = Regex::new(directory_description_regex)
+        .context("Invalid regex for task directory match")?;
+    // Get all of the changed files
+    let pr_files_pages = octocrab
+        .pulls(org_name, module_name)
+        .list_files(pr_number)
+        .await
+        .context("Failed to get changed files")?;
+    if pr_files_pages.items.is_empty() {
+        return Ok(Some(ValidationResult::NoFiles)); // no files committed
+    }
+    let pr_files_all = octocrab
+        .all_pages(pr_files_pages)
+        .await
+        .context("Failed to list all changed files")?;
+    let pr_files = pr_files_all.into_iter();
+    // check each file and error if one is in unexpected place
+    for pr_file in pr_files {
+        if !directory_matcher.is_match(&pr_file.filename) {
+            return Ok(Some(ValidationResult::WrongFiles {
+                files: directory_description_regex.to_string(),
+            }));
+        }
+    }
+    Ok(None)
 }
 
 struct KnownRegions(BTreeMap<&'static str, Vec<&'static str>>);
