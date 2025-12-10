@@ -311,7 +311,7 @@ pub enum Assignment {
     },
     ExpectedPullRequest {
         title: String,
-        html_url: Url,
+        html_url: Url, // TODO convert the task ID here
         optionality: AssignmentOptionality,
     },
 }
@@ -540,7 +540,7 @@ pub enum Submission {
     PullRequest {
         pull_request: Pr,
         optionality: AssignmentOptionality,
-        assignment_descriptor: Assignment
+        assignment_descriptor: u64
     },
 }
 
@@ -992,6 +992,7 @@ fn match_pr_to_assignment(
             }
         }
     }
+
     if let Some(Match {
         sprint_index,
         assignment_index,
@@ -999,15 +1000,52 @@ fn match_pr_to_assignment(
         ..
     }) = best_match
     {
+
+        let assignment_descriptor = assignments[sprint_index].assignments[assignment_index].clone();
+        let pr_assignment_descriptor_id: u64 = match assignment_descriptor {
+            Assignment::ExpectedPullRequest { html_url, .. } => {
+                Regex::new("/(\\d+)$")
+                    .unwrap()
+                    .captures(html_url.path())
+                    .unwrap()
+                    .get(1)
+                    .unwrap()
+                    .as_str()
+                    .parse::<u64>()
+                    .unwrap()
+            },
+            _ => 0
+        };
         submissions[sprint_index].submissions[assignment_index] =
             SubmissionState::Some(Submission::PullRequest {
                 pull_request: pr,
                 optionality,
-                assignment_descriptor: assignments[sprint_index].assignments[assignment_index].clone()
+                assignment_descriptor: pr_assignment_descriptor_id
             });
     } else if !pr.is_closed {
         unknown_prs.push(pr);
     }
+}
+
+// Given a vector of sprints, and a target pr number, for a given person
+// return the issue ID for the associated assignment descriptor
+pub fn get_descriptor_id_for_pr(sprints: Vec<SprintWithSubmissions>, target_pr_number: u64) -> u64 {
+    match sprints
+        .iter()
+        .map(|sprint_with_subs| sprint_with_subs.submissions.clone())
+        .flatten()
+        .filter_map(|missing_or_submission| match missing_or_submission {
+            SubmissionState::Some(s) => Some(s),
+            _ => None
+        })
+        .find(|submission| match submission {
+            Submission::PullRequest { pull_request,  .. }
+            => pull_request.number == target_pr_number,
+            _ => false
+        }) {
+            Some(Submission::PullRequest {assignment_descriptor, ..}) => assignment_descriptor,
+            _ => 0 // TODO once again, we need to handle this error better
+        }
 }
 
 fn make_title_more_matchable(title: &str) -> IndexSet<String> {

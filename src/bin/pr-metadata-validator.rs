@@ -9,7 +9,7 @@ use regex::Regex;
 use trainee_tracker::{
     Error,
     config::{CourseSchedule, CourseScheduleWithRegisterSheetId},
-    course::match_prs_to_assignments,
+    course::{match_prs_to_assignments, get_descriptor_id_for_pr},
     newtypes::Region,
     octocrab::octocrab_for_token,
     prs::get_prs,
@@ -251,38 +251,7 @@ async fn validate_pr(
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
-
-    // TODO simplify and move into course or prs
-    let mut pr_assignment_descriptor = matched.sprints
-        .iter()
-        .map(|sprint_with_subs| sprint_with_subs.submissions.clone())
-        .flatten()
-        .filter_map(|expected_or_some| match expected_or_some {
-            trainee_tracker::course::SubmissionState::Some(s) => Some(s),
-            _ => None
-        })
-        .filter_map(|sub| match sub {
-            trainee_tracker::course::Submission::PullRequest { pull_request, assignment_descriptor, .. } => {
-                if pull_request.number == pr_number {
-                    match assignment_descriptor {
-                        trainee_tracker::course::Assignment::ExpectedPullRequest { html_url, ..} => Some(html_url),
-                        _ => None
-                    }
-                } else {
-                    None
-                }
-            },
-            _ => None
-        });
-
-    let issue_id_matcher = Regex::new("/(\\d+)$").unwrap();
-    let mut pr_assignment_descriptor_id = 0; // TODO handle error if somehow this never gets set
-    while let Some(x) = pr_assignment_descriptor.next() {
-        pr_assignment_descriptor_id = match issue_id_matcher.captures(x.path()) {
-            Some(capts) => capts.get(1).unwrap().as_str().parse::<u64>().unwrap(),
-            None => { return Ok(ValidationResult::CouldNotMatch) }
-        };
-    }
+    let pr_assignment_descriptor_id = get_descriptor_id_for_pr(matched.sprints, pr_number);
 
     match check_pr_file_changes(octocrab, github_org_name, module_name, pr_number, pr_assignment_descriptor_id)
         .await {
