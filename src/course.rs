@@ -228,7 +228,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
             title: title.clone(),
             html_url: html_url.clone(),
             optionality,
-            assignment_descriptor_id: *number
+            assignment_descriptor_id: *number,
         }),
         "Codility" => {
             // TODO: Handle these.
@@ -543,7 +543,7 @@ pub enum Submission {
     PullRequest {
         pull_request: Pr,
         optionality: AssignmentOptionality,
-        assignment_descriptor: u64
+        assignment_descriptor: u64,
     },
 }
 
@@ -1003,16 +1003,19 @@ fn match_pr_to_assignment(
         ..
     }) = best_match
     {
-
-        let pr_assignment_descriptor_id: u64 = match assignments[sprint_index].assignments[assignment_index] {
-            Assignment::ExpectedPullRequest { assignment_descriptor_id, .. } => assignment_descriptor_id,
-            _ => 0
-        };
+        let pr_assignment_descriptor_id: u64 =
+            match assignments[sprint_index].assignments[assignment_index] {
+                Assignment::ExpectedPullRequest {
+                    assignment_descriptor_id,
+                    ..
+                } => assignment_descriptor_id,
+                _ => 0,
+            };
         submissions[sprint_index].submissions[assignment_index] =
             SubmissionState::Some(Submission::PullRequest {
                 pull_request: pr,
                 optionality,
-                assignment_descriptor: pr_assignment_descriptor_id
+                assignment_descriptor: pr_assignment_descriptor_id,
             });
     } else if !pr.is_closed {
         unknown_prs.push(pr);
@@ -1027,16 +1030,18 @@ pub fn get_descriptor_id_for_pr(sprints: Vec<SprintWithSubmissions>, target_pr_n
         .flat_map(|sprint_with_subs| sprint_with_subs.submissions.clone())
         .filter_map(|missing_or_submission| match missing_or_submission {
             SubmissionState::Some(s) => Some(s),
-            _ => None
+            _ => None,
         })
         .find(|submission| match submission {
-            Submission::PullRequest { pull_request,  .. }
-            => pull_request.number == target_pr_number,
-            _ => false
+            Submission::PullRequest { pull_request, .. } => pull_request.number == target_pr_number,
+            _ => false,
         }) {
-            Some(Submission::PullRequest {assignment_descriptor, ..}) => assignment_descriptor,
-            _ => 0
-        }
+        Some(Submission::PullRequest {
+            assignment_descriptor,
+            ..
+        }) => assignment_descriptor,
+        _ => 0,
+    }
 }
 
 fn make_title_more_matchable(title: &str) -> IndexSet<String> {

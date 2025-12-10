@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, process::exit};
 
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use chrono::NaiveDate;
 use indexmap::IndexMap;
 use maplit::btreemap;
@@ -9,7 +9,7 @@ use regex::Regex;
 use trainee_tracker::{
     Error,
     config::{CourseSchedule, CourseScheduleWithRegisterSheetId},
-    course::{match_prs_to_assignments, get_descriptor_id_for_pr},
+    course::{get_descriptor_id_for_pr, match_prs_to_assignments},
     newtypes::Region,
     octocrab::octocrab_for_token,
     prs::get_prs,
@@ -85,9 +85,7 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
-        ValidationResult::WrongFiles { files } => {
-            &format!("{}{}`", WRONG_FILES, files)
-        },
+        ValidationResult::WrongFiles { files } => &format!("{}{}`", WRONG_FILES, files),
         ValidationResult::NoFiles => NO_FILES,
     };
 
@@ -160,7 +158,7 @@ enum ValidationResult {
     BadTitleFormat { reason: String },
     UnknownRegion,
     WrongFiles { files: String },
-    NoFiles
+    NoFiles,
 }
 
 async fn validate_pr(
@@ -253,12 +251,21 @@ async fn validate_pr(
 
     let pr_assignment_descriptor_id = get_descriptor_id_for_pr(matched.sprints, pr_number);
 
-    match check_pr_file_changes(octocrab, github_org_name, module_name, pr_number, pr_assignment_descriptor_id)
-        .await {
-            Ok(Some(problem)) => return Ok(problem),
-            Ok(None) => (),
-            Err(e) => { let _ = anyhow!(e); }
+    match check_pr_file_changes(
+        octocrab,
+        github_org_name,
+        module_name,
+        pr_number,
+        pr_assignment_descriptor_id,
+    )
+    .await
+    {
+        Ok(Some(problem)) => return Ok(problem),
+        Ok(None) => (),
+        Err(e) => {
+            let _ = anyhow!(e);
         }
+    }
 
     Ok(ValidationResult::Ok)
 }
@@ -275,18 +282,19 @@ async fn check_pr_file_changes(
     let task_issue = match octocrab
         .issues(org_name, module_name)
         .get(task_issue_number)
-        .await {
-            Ok(iss) => iss,
-            Err(_) => return Ok(Some(ValidationResult::CouldNotMatch)) // Failed to find the right task
-        };
+        .await
+    {
+        Ok(iss) => iss,
+        Err(_) => return Ok(Some(ValidationResult::CouldNotMatch)), // Failed to find the right task
+    };
     let task_issue_body = match task_issue.body {
         Some(body) => body,
-        None => return Ok(None) // Task is empty, nothing left to check
+        None => return Ok(None), // Task is empty, nothing left to check
     };
     let directory_description = Regex::new("CHANGE_DIR=(.+)\\n").unwrap();
     let directory_description_regex = match directory_description.captures(&task_issue_body) {
         Some(capts) => capts.get(1).unwrap().as_str(), // Only allows a single directory for now
-        None => return Ok(None) // There is no match defined for this task, don't do any more checks
+        None => return Ok(None), // There is no match defined for this task, don't do any more checks
     };
     let directory_matcher = Regex::new(directory_description_regex)
         .context("Invalid regex for task directory match")?;
@@ -303,14 +311,13 @@ async fn check_pr_file_changes(
         .all_pages(pr_files_pages)
         .await
         .context("Failed to list all changed files")?;
-    let pr_files = pr_files_all
-        .into_iter();
+    let pr_files = pr_files_all.into_iter();
     // check each file and error if one is in unexpected place
     for pr_file in pr_files {
         if !directory_matcher.is_match(&pr_file.filename) {
             return Ok(Some(ValidationResult::WrongFiles {
-                files: directory_description_regex.to_string()
-            }))
+                files: directory_description_regex.to_string(),
+            }));
         }
     }
     Ok(None)
