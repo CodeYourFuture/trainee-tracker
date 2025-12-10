@@ -296,24 +296,24 @@ async fn check_pr_file_changes(
         .list_files(pr_number)
         .await
         .context("Failed to get changed files")?;
-    if pr_files_pages.items.len() == 0 {
+    if pr_files_pages.items.is_empty() {
         return Ok(Some(ValidationResult::NoFiles)); // no files committed
     }
     let pr_files_all = octocrab
         .all_pages(pr_files_pages)
         .await
         .context("Failed to list all changed files")?;
-    let mut pr_files = pr_files_all
+    let pr_files = pr_files_all
         .into_iter();
     // check each file and error if one is in unexpected place
-    while let Some(pr_file) = pr_files.next() {
+    for pr_file in pr_files {
         if !directory_matcher.is_match(&pr_file.filename) {
             return Ok(Some(ValidationResult::WrongFiles {
                 files: directory_description_regex.to_string()
             }))
         }
     }
-    return Ok(None);
+    Ok(None)
 }
 
 struct KnownRegions(BTreeMap<&'static str, Vec<&'static str>>);

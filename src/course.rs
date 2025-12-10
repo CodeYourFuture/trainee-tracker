@@ -1024,8 +1024,7 @@ fn match_pr_to_assignment(
 pub fn get_descriptor_id_for_pr(sprints: Vec<SprintWithSubmissions>, target_pr_number: u64) -> u64 {
     match sprints
         .iter()
-        .map(|sprint_with_subs| sprint_with_subs.submissions.clone())
-        .flatten()
+        .flat_map(|sprint_with_subs| sprint_with_subs.submissions.clone())
         .filter_map(|missing_or_submission| match missing_or_submission {
             SubmissionState::Some(s) => Some(s),
             _ => None
