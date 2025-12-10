@@ -438,6 +438,7 @@ impl TraineeWithSubmissions {
                         SubmissionState::Some(Submission::PullRequest {
                             pull_request,
                             optionality,
+                            ..
                         }) => {
                             let max = match optionality {
                                 AssignmentOptionality::Mandatory => 10,
@@ -539,6 +540,7 @@ pub enum Submission {
     PullRequest {
         pull_request: Pr,
         optionality: AssignmentOptionality,
+        assignment_descriptor: Assignment
     },
 }
 
@@ -1001,6 +1003,7 @@ fn match_pr_to_assignment(
             SubmissionState::Some(Submission::PullRequest {
                 pull_request: pr,
                 optionality,
+                assignment_descriptor: assignments[sprint_index].assignments[assignment_index].clone()
             });
     } else if !pr.is_closed {
         unknown_prs.push(pr);

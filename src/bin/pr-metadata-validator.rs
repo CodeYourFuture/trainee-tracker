@@ -85,7 +85,10 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
-        ValidationResult::WrongFiles => WRONG_FILES,
+        ValidationResult::WrongFiles { files } => {
+            &format!("{}{}`", WRONG_FILES, files)
+        },
+        ValidationResult::NoFiles => NO_FILES,
     };
 
     let full_message = format!(
@@ -142,7 +145,13 @@ Please check the expected title format, and make sure your region is in the corr
 
 const WRONG_FILES: &str = r#"The changed files in this PR don't match what is expected for this task.
 
-Please check that you committed the right files for the task, and that there are no accidentally committed files from other sprints."#;
+Please check that you committed the right files for the task, and that there are no accidentally committed files from other sprints.
+
+Please review the changed files tab at the top of the page, we are only expecting changes in this directory: `"#;
+
+const NO_FILES: &str = r#"This PR is missing any submitted files.
+
+Please check that you committed the right files and pushed to the repository"#;
 
 enum ValidationResult {
     Ok,
@@ -150,7 +159,8 @@ enum ValidationResult {
     CouldNotMatch,
     BadTitleFormat { reason: String },
     UnknownRegion,
-    WrongFiles
+    WrongFiles { files: String },
+    NoFiles
 }
 
 async fn validate_pr(
@@ -241,7 +251,40 @@ async fn validate_pr(
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
-    match check_pr_file_changes(octocrab, github_org_name, module_name, pr_number, 35) // TODO get the correct one,just default to this for testing now
+
+    // TODO simplify and move into course or prs
+    let mut pr_assignment_descriptor = matched.sprints
+        .iter()
+        .map(|sprint_with_subs| sprint_with_subs.submissions.clone())
+        .flatten()
+        .filter_map(|expected_or_some| match expected_or_some {
+            trainee_tracker::course::SubmissionState::Some(s) => Some(s),
+            _ => None
+        })
+        .filter_map(|sub| match sub {
+            trainee_tracker::course::Submission::PullRequest { pull_request, assignment_descriptor, .. } => {
+                if pull_request.number == pr_number {
+                    match assignment_descriptor {
+                        trainee_tracker::course::Assignment::ExpectedPullRequest { html_url, ..} => Some(html_url),
+                        _ => None
+                    }
+                } else {
+                    None
+                }
+            },
+            _ => None
+        });
+
+    let issue_id_matcher = Regex::new("/(\\d+)$").unwrap();
+    let mut pr_assignment_descriptor_id = 0; // TODO handle error if somehow this never gets set
+    while let Some(x) = pr_assignment_descriptor.next() {
+        pr_assignment_descriptor_id = match issue_id_matcher.captures(x.path()) {
+            Some(capts) => capts.get(1).unwrap().as_str().parse::<u64>().unwrap(),
+            None => { return Ok(ValidationResult::CouldNotMatch) }
+        };
+    }
+
+    match check_pr_file_changes(octocrab, github_org_name, module_name, pr_number, pr_assignment_descriptor_id)
         .await {
             Ok(Some(problem)) => return Ok(problem),
             Ok(None) => (),
@@ -285,7 +328,7 @@ async fn check_pr_file_changes(
         .await
         .context("Failed to get changed files")?;
     if pr_files_pages.items.len() == 0 {
-        return Ok(Some(ValidationResult::WrongFiles)); // no files committed
+        return Ok(Some(ValidationResult::NoFiles)); // no files committed
     }
     let pr_files_all = octocrab
         .all_pages(pr_files_pages)
@@ -293,15 +336,12 @@ async fn check_pr_file_changes(
         .context("Failed to list all changed files")?;
     let mut pr_files = pr_files_all
         .into_iter();
-    let mut i = 0;
     // check each file and error if one is in unexpected place
-    println!("{}", directory_description_regex);
     while let Some(pr_file) = pr_files.next() {
-        i += 1;
-        println!("{}{}", i, pr_file.filename);
         if !directory_matcher.is_match(&pr_file.filename) {
-            println!("Found bad match");
-            return Ok(Some(ValidationResult::WrongFiles))
+            return Ok(Some(ValidationResult::WrongFiles {
+                files: directory_description_regex.to_string()
+            }))
         }
     }
     return Ok(None);
