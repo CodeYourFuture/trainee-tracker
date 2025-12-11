@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use ::octocrab::models::{Author, teams::RequestedTeam};
 use anyhow::Context;
 use axum::{
@@ -218,14 +216,13 @@ pub async fn get_region(
     }))
 }
 
-type SprintAttendance = BTreeMap<String, Vec<Attendance>>;
-type ModuleAttendance = BTreeMap<String, SprintAttendance>;
-type BatchAttendance = BTreeMap<String, ModuleAttendance>;
-type CourseAttendance = BTreeMap<String, BatchAttendance>;
-
 #[derive(Serialize)]
 pub struct AttendanceResponse {
-    courses: CourseAttendance,
+    #[serde(flatten)]
+    attendance: Attendance,
+    sprint: String,
+    module: String,
+    batch: String,
 }
 
 pub async fn fetch_attendance(
@@ -233,7 +230,7 @@ pub async fn fetch_attendance(
     headers: HeaderMap,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
-) -> Result<Json<AttendanceResponse>, Error> {
+) -> Result<Json<Vec<AttendanceResponse>>, Error> {
     let all_courses = &server_state.config.courses;
     let sheets_client = sheets_client(
         &session,
@@ -243,7 +240,6 @@ pub async fn fetch_attendance(
     )
     .await?;
 
-    let mut courses: CourseAttendance = BTreeMap::new();
     let mut register_futures = Vec::new();
     for (course_name, course_info) in all_courses {
         for batch_name in course_info.batches.keys() {
@@ -268,32 +264,23 @@ pub async fn fetch_attendance(
     }
     let register_info = join_all(register_futures).await;
 
-    for (course_name, batch_name, register_result) in register_info {
+    let mut registered_attendance = Vec::new();
+
+    for (_course_name, batch_name, register_result) in register_info {
         let register = register_result?;
-        let modules = register
-            .modules
-            .into_iter()
-            .map(|(module_name, sprint_info)| {
-                (
-                    module_name,
-                    sprint_info
-                        .attendance
-                        .into_iter()
-                        .enumerate()
-                        .map(|(sprint_number, sprint_info)| {
-                            (
-                                format!("Sprint-{}", sprint_number + 1),
-                                sprint_info.into_values().collect(),
-                            )
-                        })
-                        .collect(),
-                )
-            })
-            .collect();
-        courses
-            .entry(course_name)
-            .or_default()
-            .insert(batch_name, modules);
+        for (module_name, sprint_info) in register.modules {
+            for (sprint_number, attendance_info) in sprint_info.attendance.iter().enumerate() {
+                let sprint_name = format!("Sprint-{}", sprint_number + 1);
+                for attendance in attendance_info.values() {
+                    registered_attendance.push(AttendanceResponse {
+                        attendance: attendance.clone(),
+                        sprint: sprint_name.clone(),
+                        module: module_name.clone(),
+                        batch: batch_name.clone(),
+                    });
+                }
+            }
+        }
     }
-    Ok(Json(AttendanceResponse { courses }))
+    Ok(Json(registered_attendance))
 }
