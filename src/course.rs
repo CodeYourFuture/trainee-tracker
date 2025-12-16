@@ -144,22 +144,16 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
         ..
     } = issue;
 
-    let mut sprint = None;
+    let mut sprints = Vec::new();
 
     let mut submit_label = None;
     let mut optionality = None;
 
     for label in labels {
         if let Some(sprint_number) = label.name.strip_prefix("📅 Sprint ") {
-            if sprint.is_some() {
-                return Err(Error::UserFacing(format!(
-                    "Failed to parse issue {} - duplicate sprint labels",
-                    html_url
-                )));
-            }
             match NonZeroUsize::from_str(sprint_number) {
                 Ok(sprint_number) => {
-                    sprint = Some(sprint_number);
+                    sprints.push(sprint_number);
                 }
                 Err(_err) => {
                     return Err(Error::UserFacing(format!(
@@ -198,20 +192,11 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
         }
     }
 
-    let sprint = sprint.ok_or_else(|| {
-        Error::UserFacing(format!(
-            "Failed to parse issue {} - no sprint label.{}",
-            html_url, BAD_LABEL_SUFFIX,
-        ))
-    })?;
-
-    let submit_label = match submit_label {
-        Some(submit_label) => submit_label,
-        // TODO: For now we treat a missing Submit label as an issue to ignore.
-        // When all issues have Submit labels, we should error if they're missing.
-        None => {
-            return Ok(Some((sprint, None)));
-        }
+    let Some(submit_label) = submit_label else {
+        return Err(Error::UserFacing(format!(
+            "Failed to parse issue {} - no submit label.{}",
+            html_url, BAD_LABEL_SUFFIX
+        )));
     };
 
     let optionality = optionality.ok_or_else(|| {
@@ -244,6 +229,21 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
             return Err(Error::UserFacing(format!(
                 "Failed to parse issue {} - submit label wasn't recognised: {}",
                 html_url, other
+            )));
+        }
+    };
+
+    let sprint = match sprints.as_slice() {
+        [sprint] => *sprint,
+        [] if assignment.is_none() => {
+            return Ok(None);
+        }
+        // If empty (and assignment is not None), or more than one value:
+        empty_or_more_than_one => {
+            return Err(Error::UserFacing(format!(
+                "Failed to parse issue {} - expected exactly one sprint label but got {}",
+                html_url,
+                empty_or_more_than_one.len()
             )));
         }
     };
