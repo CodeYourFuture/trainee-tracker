@@ -300,7 +300,8 @@ async fn check_pr_file_changes(
         None => return Ok(None), // There is no match defined for this task, don't do any more checks
     };
     let directory_matcher = Regex::new(directory_description_regex)
-        .context("Invalid regex for task directory match")?;
+        .with_context(|| format!("Check CHANGE_DIR declaration in issue {}", task_issue.html_url))
+        .expect("Failed to compile regex");
     // Get all of the changed files
     let pr_files = all_pages("changed files in pull request", octocrab, async || {
         octocrab
