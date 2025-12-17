@@ -228,7 +228,6 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
             title: title.clone(),
             html_url: html_url.clone(),
             optionality,
-            assignment_descriptor_id: *number,
             assignment_issue_id: *number,
         }),
         "Codility" => {
