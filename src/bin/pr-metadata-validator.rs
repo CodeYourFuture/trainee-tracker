@@ -85,7 +85,7 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
-        ValidationResult::WrongFiles { files } => &format!("{}{}`", WRONG_FILES, files),
+        ValidationResult::WrongFiles { expected_files_pattern } => &format!("{}`{}`", WRONG_FILES, expected_files_pattern),
         ValidationResult::NoFiles => NO_FILES,
     };
 
@@ -145,7 +145,7 @@ const WRONG_FILES: &str = r#"The changed files in this PR don't match what is ex
 
 Please check that you committed the right files for the task, and that there are no accidentally committed files from other sprints.
 
-Please review the changed files tab at the top of the page, we are only expecting changes in this directory: `"#;
+Please review the changed files tab at the top of the page, we are only expecting changes in this directory: "#;
 
 const NO_FILES: &str = r#"This PR is missing any submitted files.
 
@@ -157,7 +157,7 @@ enum ValidationResult {
     CouldNotMatch,
     BadTitleFormat { reason: String },
     UnknownRegion,
-    WrongFiles { files: String },
+    WrongFiles { expected_files_pattern: String },
     NoFiles,
 }
 
@@ -316,7 +316,7 @@ async fn check_pr_file_changes(
     for pr_file in pr_files {
         if !directory_matcher.is_match(&pr_file.filename) {
             return Ok(Some(ValidationResult::WrongFiles {
-                files: directory_description_regex.to_string(),
+                expected_files_pattern: directory_description_regex.to_string(),
             }));
         }
     }
