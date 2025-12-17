@@ -85,7 +85,9 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
-        ValidationResult::WrongFiles { expected_files_pattern } => &format!("{}`{}`", WRONG_FILES, expected_files_pattern),
+        ValidationResult::WrongFiles {
+            expected_files_pattern,
+        } => &format!("{}`{}`", WRONG_FILES, expected_files_pattern),
         ValidationResult::NoFiles => NO_FILES,
     };
 
@@ -287,10 +289,7 @@ async fn check_pr_file_changes(
         Ok(iss) => iss,
         Err(_) => return Ok(Some(ValidationResult::CouldNotMatch)), // Failed to find the right task
     };
-    let task_issue_body = match task_issue.body {
-        Some(body) => body,
-        None => return Ok(None), // Task is empty, nothing left to check
-    };
+    let task_issue_body = task_issue.body.unwrap_or_default();
     let directory_description = Regex::new("CHANGE_DIR=(.+)\\n").unwrap();
     let directory_description_regex = match directory_description.captures(&task_issue_body) {
         Some(capts) => capts.get(1).unwrap().as_str(), // Only allows a single directory for now
