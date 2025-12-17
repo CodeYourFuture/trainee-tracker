@@ -284,24 +284,32 @@ async fn check_pr_file_changes(
     task_issue_number: u64,
 ) -> Result<Option<ValidationResult>, Error> {
     // Get the Sprint Task's description of expected changes
-    let task_issue = match octocrab
+    let Ok(task_issue) = octocrab
         .issues(org_name, module_name)
         .get(task_issue_number)
         .await
-    {
-        Ok(iss) => iss,
-        Err(_) => return Ok(Some(ValidationResult::CouldNotMatch)), // Failed to find the right task
+    else {
+        return Ok(Some(ValidationResult::CouldNotMatch)); // Failed to find the right task
     };
+
     let task_issue_body = task_issue.body.unwrap_or_default();
+
     let directory_description =
         Regex::new("CHANGE_DIR=(.+)\\n").expect("Known good regex failed to compile");
-    let directory_description_regex = match directory_description.captures(&task_issue_body) {
-        Some(capts) => capts
-            .get(1)
-            .expect("Regex capture failed to return string match")
-            .as_str(), // Only allows a single directory for now
-        None => return Ok(None), // There is no match defined for this task, don't do any more checks
+    let Some(directory_regex_captures) = directory_description.captures(&task_issue_body) else {
+        return Ok(None); // There is no match defined for this task, don't do any more checks
     };
+    let directory_description_regex = directory_regex_captures
+        .get(1)
+        .with_context(|| {
+            format!(
+                "Check CHANGE_DIR declaration in issue {}",
+                task_issue.html_url
+            )
+        })
+        .expect("Regex capture failed to return string match")
+        .as_str(); // Only allows a single directory for now
+
     let directory_matcher = Regex::new(directory_description_regex)
         .with_context(|| {
             format!(
@@ -310,6 +318,7 @@ async fn check_pr_file_changes(
             )
         })
         .expect("Failed to compile regex");
+
     // Get all of the changed files
     let pr_files = all_pages("changed files in pull request", octocrab, async || {
         octocrab
@@ -321,6 +330,7 @@ async fn check_pr_file_changes(
     if pr_files.is_empty() {
         return Ok(Some(ValidationResult::NoFiles)); // no files committed
     }
+
     // check each file and error if one is in unexpected place
     for pr_file in pr_files {
         if !directory_matcher.is_match(&pr_file.filename) {
@@ -329,6 +339,7 @@ async fn check_pr_file_changes(
             }));
         }
     }
+
     Ok(None)
 }
 
