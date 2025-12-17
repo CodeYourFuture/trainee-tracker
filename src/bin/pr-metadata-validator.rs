@@ -290,9 +290,13 @@ async fn check_pr_file_changes(
         Err(_) => return Ok(Some(ValidationResult::CouldNotMatch)), // Failed to find the right task
     };
     let task_issue_body = task_issue.body.unwrap_or_default();
-    let directory_description = Regex::new("CHANGE_DIR=(.+)\\n").unwrap();
+    let directory_description =
+        Regex::new("CHANGE_DIR=(.+)\\n").expect("Known good regex failed to compile");
     let directory_description_regex = match directory_description.captures(&task_issue_body) {
-        Some(capts) => capts.get(1).unwrap().as_str(), // Only allows a single directory for now
+        Some(capts) => capts
+            .get(1)
+            .expect("Regex capture failed to return string match")
+            .as_str(), // Only allows a single directory for now
         None => return Ok(None), // There is no match defined for this task, don't do any more checks
     };
     let directory_matcher = Regex::new(directory_description_regex)
