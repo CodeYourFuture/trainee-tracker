@@ -1,6 +1,7 @@
 use std::{fmt::Display, str::FromStr};
 
 use case_insensitive_string::CaseInsensitiveString;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use email_address::EmailAddress;
 use serde::{Deserialize, Serialize};
 
@@ -51,5 +52,17 @@ impl Region {
 
     pub fn as_str(&self) -> &str {
         self.0.as_str()
+    }
+
+    pub fn class_start_time(&self, date: &NaiveDate) -> DateTime<Utc> {
+        let offset = self.timezone().offset_from_utc_date(date);
+        DateTime::<chrono_tz::Tz>::from_naive_utc_and_offset(
+            NaiveDateTime::new(
+                *date,
+                NaiveTime::from_hms_opt(10, 00, 00).expect("Known time failed to parse"),
+            ),
+            offset,
+        )
+        .to_utc()
     }
 }

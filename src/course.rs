@@ -16,8 +16,7 @@ use crate::{
     sheets::SheetsClient,
 };
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use chrono_tz::Tz;
+use chrono::{NaiveDate, Utc};
 use email_address::EmailAddress;
 use futures::future::join_all;
 use indexmap::{IndexMap, IndexSet};
@@ -800,14 +799,7 @@ fn get_trainee_module_attendance(
                     .collect::<Vec<chrono::NaiveDate>>();
                 let attendance = match dates.as_slice() {
                     [date] => {
-                        let start_time = DateTime::<Tz>::from_naive_utc_and_offset(
-                            NaiveDateTime::new(
-                                date.clone(),
-                                NaiveTime::from_hms_opt(10, 00, 00).expect("TODO"),
-                            ),
-                            region.timezone().offset_from_utc_date(date),
-                        )
-                        .to_utc();
+                        let start_time = region.class_start_time(date);
                         let attendance = module_attendance
                             .attendance
                             .get(sprint_index)
