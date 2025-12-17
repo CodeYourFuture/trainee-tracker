@@ -252,7 +252,7 @@ async fn validate_pr(
     }
 
     let pr_assignment_descriptor_id =
-        get_descriptor_id_for_pr(matched.sprints, pr_number).expect("This PR does not exist");
+        get_descriptor_id_for_pr(&matched.sprints, pr_number).expect("This PR does not exist");
     // This should never error, as a PR by this point in code must have been matched
     // with an assignment, and PR assignments must have an associated issue descriptor
 

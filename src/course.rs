@@ -1021,12 +1021,12 @@ fn match_pr_to_assignment(
 // Given a vector of sprints, and a target pr number, for a given person
 // return the issue ID for the associated assignment descriptor
 pub fn get_descriptor_id_for_pr(
-    sprints: Vec<SprintWithSubmissions>,
+    sprints: &[SprintWithSubmissions],
     target_pr_number: u64,
 ) -> Option<u64> {
     match sprints
         .iter()
-        .flat_map(|sprint_with_subs| sprint_with_subs.submissions.clone())
+        .flat_map(|sprint_with_subs| sprint_with_subs.submissions.iter())
         .filter_map(|missing_or_submission| match missing_or_submission {
             SubmissionState::Some(s) => Some(s),
             _ => None,
@@ -1038,7 +1038,7 @@ pub fn get_descriptor_id_for_pr(
         Some(Submission::PullRequest {
             assignment_issue_id,
             ..
-        }) => Some(assignment_issue_id),
+        }) => Some(*assignment_issue_id),
         _ => None, // Was called with a nonexistent PR number, can't find an associated assignment
     }
 }
