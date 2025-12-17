@@ -251,7 +251,10 @@ async fn validate_pr(
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
-    let pr_assignment_descriptor_id = get_descriptor_id_for_pr(matched.sprints, pr_number);
+    let pr_assignment_descriptor_id =
+        get_descriptor_id_for_pr(matched.sprints, pr_number).expect("This PR does not exist");
+    // This should never error, as a PR by this point in code must have been matched
+    // with an assignment, and PR assignments must have an associated issue descriptor
 
     match check_pr_file_changes(
         octocrab,
@@ -300,7 +303,12 @@ async fn check_pr_file_changes(
         None => return Ok(None), // There is no match defined for this task, don't do any more checks
     };
     let directory_matcher = Regex::new(directory_description_regex)
-        .with_context(|| format!("Check CHANGE_DIR declaration in issue {}", task_issue.html_url))
+        .with_context(|| {
+            format!(
+                "Check CHANGE_DIR declaration in issue {}",
+                task_issue.html_url
+            )
+        })
         .expect("Failed to compile regex");
     // Get all of the changed files
     let pr_files = all_pages("changed files in pull request", octocrab, async || {

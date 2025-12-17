@@ -314,7 +314,7 @@ pub enum Assignment {
     ExpectedPullRequest {
         title: String,
         html_url: Url,
-        assignment_descriptor_id: u64,
+        assignment_issue_id: u64,
         optionality: AssignmentOptionality,
     },
 }
@@ -543,7 +543,7 @@ pub enum Submission {
     PullRequest {
         pull_request: Pr,
         optionality: AssignmentOptionality,
-        assignment_descriptor: u64,
+        assignment_issue_id: u64,
     },
 }
 
@@ -944,6 +944,7 @@ fn match_pr_to_assignment(
         sprint_index: usize,
         assignment_index: usize,
         optionality: AssignmentOptionality,
+        assignment_issue_id: u64,
     }
 
     let mut best_match: Option<Match> = None;
@@ -964,6 +965,7 @@ fn match_pr_to_assignment(
                 Assignment::ExpectedPullRequest {
                     title: expected_title,
                     optionality,
+                    assignment_issue_id,
                     ..
                 } => {
                     let mut assignment_title_words = make_title_more_matchable(expected_title);
@@ -988,6 +990,7 @@ fn match_pr_to_assignment(
                             sprint_index,
                             assignment_index,
                             optionality: optionality.clone(),
+                            assignment_issue_id: *assignment_issue_id,
                         });
                     }
                 }
@@ -1000,22 +1003,15 @@ fn match_pr_to_assignment(
         sprint_index,
         assignment_index,
         optionality,
+        assignment_issue_id,
         ..
     }) = best_match
     {
-        let pr_assignment_descriptor_id: u64 =
-            match assignments[sprint_index].assignments[assignment_index] {
-                Assignment::ExpectedPullRequest {
-                    assignment_descriptor_id,
-                    ..
-                } => assignment_descriptor_id,
-                _ => 0,
-            };
         submissions[sprint_index].submissions[assignment_index] =
             SubmissionState::Some(Submission::PullRequest {
                 pull_request: pr,
                 optionality,
-                assignment_descriptor: pr_assignment_descriptor_id,
+                assignment_issue_id: assignment_issue_id,
             });
     } else if !pr.is_closed {
         unknown_prs.push(pr);
@@ -1024,7 +1020,10 @@ fn match_pr_to_assignment(
 
 // Given a vector of sprints, and a target pr number, for a given person
 // return the issue ID for the associated assignment descriptor
-pub fn get_descriptor_id_for_pr(sprints: Vec<SprintWithSubmissions>, target_pr_number: u64) -> u64 {
+pub fn get_descriptor_id_for_pr(
+    sprints: Vec<SprintWithSubmissions>,
+    target_pr_number: u64,
+) -> Option<u64> {
     match sprints
         .iter()
         .flat_map(|sprint_with_subs| sprint_with_subs.submissions.clone())
@@ -1037,10 +1036,10 @@ pub fn get_descriptor_id_for_pr(sprints: Vec<SprintWithSubmissions>, target_pr_n
             _ => false,
         }) {
         Some(Submission::PullRequest {
-            assignment_descriptor,
+            assignment_issue_id,
             ..
-        }) => assignment_descriptor,
-        _ => 0,
+        }) => Some(assignment_issue_id),
+        _ => None, // Was called with a nonexistent PR number, can't find an associated assignment
     }
 }
 
