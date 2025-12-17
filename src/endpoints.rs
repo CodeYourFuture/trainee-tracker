@@ -1,3 +1,5 @@
+use std::{collections::BTreeMap, ops::AddAssign};
+
 use ::octocrab::models::{Author, teams::RequestedTeam};
 use anyhow::Context;
 use axum::{
@@ -5,6 +7,7 @@ use axum::{
     extract::{OriginalUri, Path, State},
     response::IntoResponse,
 };
+use chrono::Utc;
 use futures::future::join_all;
 use http::HeaderMap;
 use indexmap::IndexMap;
@@ -283,4 +286,48 @@ pub async fn fetch_attendance(
         }
     }
     Ok(Json(registered_attendance))
+}
+
+#[derive(Serialize)]
+pub struct ExpectedAttendance {
+    course: String,
+    cohort: String,
+    region: crate::newtypes::Region,
+    expected_classes: usize,
+}
+
+pub async fn expected_attendance(
+    State(server_state): State<ServerState>,
+) -> Json<Vec<ExpectedAttendance>> {
+    let now = Utc::now();
+
+    let mut expected_attendance = Vec::new();
+    for (course, course_info) in server_state.config.courses {
+        for (cohort, schedule) in course_info.batches {
+            let mut region_to_expected_classes: BTreeMap<crate::newtypes::Region, usize> =
+                BTreeMap::new();
+            for (_module_name, sprints) in schedule.sprints {
+                for sprint in sprints {
+                    for (region, date) in sprint {
+                        let start_time = region.class_start_time(&date);
+                        if start_time < now {
+                            region_to_expected_classes
+                                .entry(region)
+                                .or_default()
+                                .add_assign(1);
+                        }
+                    }
+                }
+            }
+            for (region, expected_classes) in region_to_expected_classes {
+                expected_attendance.push(ExpectedAttendance {
+                    course: course.clone(),
+                    cohort: cohort.clone(),
+                    region,
+                    expected_classes,
+                })
+            }
+        }
+    }
+    Json(expected_attendance)
 }
