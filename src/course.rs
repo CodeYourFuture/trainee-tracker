@@ -1011,7 +1011,7 @@ fn match_pr_to_assignment(
             SubmissionState::Some(Submission::PullRequest {
                 pull_request: pr,
                 optionality,
-                assignment_issue_id: assignment_issue_id,
+                assignment_issue_id,
             });
     } else if !pr.is_closed {
         unknown_prs.push(pr);
