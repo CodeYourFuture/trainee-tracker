@@ -81,7 +81,7 @@ pub fn octocrab_for_token(token: String) -> Result<Octocrab, Error> {
     Ok(octocrab)
 }
 
-pub(crate) async fn all_pages<T: DeserializeOwned>(
+pub async fn all_pages<T: DeserializeOwned>(
     description: &str,
     octocrab: &Octocrab,
     func: impl AsyncFnOnce() -> Result<octocrab::Page<T>, octocrab::Error>,

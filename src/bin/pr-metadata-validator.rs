@@ -11,7 +11,7 @@ use trainee_tracker::{
     config::{CourseSchedule, CourseScheduleWithRegisterSheetId},
     course::{get_descriptor_id_for_pr, match_prs_to_assignments},
     newtypes::Region,
-    octocrab::octocrab_for_token,
+    octocrab::{all_pages, octocrab_for_token},
     prs::get_prs,
 };
 
@@ -298,19 +298,16 @@ async fn check_pr_file_changes(
     let directory_matcher = Regex::new(directory_description_regex)
         .context("Invalid regex for task directory match")?;
     // Get all of the changed files
-    let pr_files_pages = octocrab
-        .pulls(org_name, module_name)
-        .list_files(pr_number)
-        .await
-        .context("Failed to get changed files")?;
-    if pr_files_pages.items.is_empty() {
+    let pr_files = all_pages("changed files in pull request", octocrab, async || {
+        octocrab
+            .pulls(org_name, module_name)
+            .list_files(pr_number)
+            .await
+    })
+    .await?;
+    if pr_files.is_empty() {
         return Ok(Some(ValidationResult::NoFiles)); // no files committed
     }
-    let pr_files_all = octocrab
-        .all_pages(pr_files_pages)
-        .await
-        .context("Failed to list all changed files")?;
-    let pr_files = pr_files_all.into_iter();
     // check each file and error if one is in unexpected place
     for pr_file in pr_files {
         if !directory_matcher.is_match(&pr_file.filename) {
