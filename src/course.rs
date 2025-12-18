@@ -122,16 +122,14 @@ impl CourseScheduleWithRegisterSheetId {
                         sprints.len()
                     )));
                 }
-                if let Some(assignment) = assignment {
-                    sprints[sprint_index].push(assignment);
-                }
+                sprints[sprint_index].push(assignment);
             }
         }
         Ok(sprints)
     }
 }
 
-fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>)>, Error> {
+fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Assignment)>, Error> {
     if issue.pull_request.is_some() {
         return Ok(None);
     }
@@ -232,12 +230,13 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
         }
     };
 
+    let Some(assignment) = assignment else {
+        return Ok(None);
+    };
+
     let sprint = match sprints.as_slice() {
         [sprint] => *sprint,
-        [] if assignment.is_none() => {
-            return Ok(None);
-        }
-        // If empty (and assignment is not None), or more than one value:
+        // If empty, or more than one value:
         empty_or_more_than_one => {
             return Err(Error::UserFacing(format!(
                 "Failed to parse issue {} - expected exactly one sprint label but got {}",
