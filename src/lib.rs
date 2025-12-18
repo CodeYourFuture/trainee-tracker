@@ -23,6 +23,7 @@ pub mod google_groups;
 pub mod mentoring;
 pub mod newtypes;
 pub mod octocrab;
+pub mod pr_comments;
 pub mod prs;
 pub mod register;
 pub mod reviewer_staff_info;
