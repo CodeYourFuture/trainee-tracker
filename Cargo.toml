@@ -11,6 +11,7 @@ axum = { version = "0.8.4", features = ["macros", "original-uri"] }
 case_insensitive_string = { version = "0.2.10", features = ["serde"] }
 chrono = "0.4.41"
 chrono-tz = "0.10.3"
+const_format = "0.2.35"
 dotenv = "0.15.0"
 # Until https://github.com/johnstonskj/rust-email_address/pull/43 is merged and released.
 email_address = { git = "https://github.com/illicitonion/rust-email_address.git", rev = "12cd9762a166b79a227beaa90b2f60a768d7c55c" }
@@ -44,6 +45,7 @@ serde_json = "1"
 serde_urlencoded = "0.7.1"
 sheets = "0.7.0"
 slack-with-types = "0.1.1"
+strum_macros = "0.27.2"
 time = "0.3.44"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tower = "0.5.2"
