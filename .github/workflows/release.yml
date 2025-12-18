@@ -22,7 +22,7 @@ jobs:
       # Presumably used to log into the GitHub Container Registry, as per https://docs.github.com/en/packages/managing-github-packages-using-github-actions-workflows/publishing-and-installing-a-package-with-github-actions.
       id-token: write
     container:
-      image: rust:1.88.0-alpine
+      image: rust:1.92.0-alpine
     steps:
       - uses: actions/checkout@v4
       - name: Install deps

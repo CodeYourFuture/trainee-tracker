@@ -18,7 +18,7 @@ const ARBITRARY_REGION: Region = Region(String::new());
 
 #[tokio::main]
 async fn main() {
-    let Ok([_argv0, pr_url]) = <[_; 2]>::try_from(std::env::args().collect::<Vec<_>>()) else {
+    let Ok([_argv0, pr_url]) = <[_; _]>::try_from(std::env::args().collect::<Vec<_>>()) else {
         eprintln!("Expected one arg - PR URL");
         exit(1);
     };
