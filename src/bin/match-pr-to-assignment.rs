@@ -13,7 +13,7 @@ use trainee_tracker::{
 #[tokio::main]
 async fn main() {
     let Ok([_argv0, github_token, pr_link]) =
-        <[_; 3]>::try_from(std::env::args().collect::<Vec<_>>())
+        <[_; _]>::try_from(std::env::args().collect::<Vec<_>>())
     else {
         eprintln!("Expected two args - github token and PR link");
         exit(1);
@@ -31,7 +31,7 @@ async fn main() {
             _pull,
             pr_number_str,
         ],
-    ) = <[_; 7]>::try_from(pr_link.split('/').collect::<Vec<_>>())
+    ) = <[_; _]>::try_from(pr_link.split('/').collect::<Vec<_>>())
     else {
         panic!("Couldn't parse GitHub PR link {}", pr_link);
     };
