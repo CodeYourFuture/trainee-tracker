@@ -29,7 +29,7 @@ jobs:
         run: apk add docker gcc g++
       - name: Build binaries
         # Copy file to rename for the release action
-        run: cargo build --release && cp target/release/pr-metadata-validator pr-metadata-validator-musl-${{ github.ref_name }}
+        run: cargo build --release && cp target/release/pr-metadata-validator pr-metadata-validator-musl-${{ github.ref_name }} && cp target/release/dummy-code-of-conduct-validator dummy-code-of-conduct-validator-musl-${{ github.ref_name }}
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
@@ -64,4 +64,6 @@ jobs:
           generate_release_notes: true
           tag_name: ${{ github.ref_name }}
           target_commitish: ${{ github.base_ref }}
-          files: pr-metadata-validator-musl-${{ github.ref_name }}
+          files: |
+            dummy-code-of-conduct-validator-musl-${{ github.ref_name }}
+            pr-metadata-validator-musl-${{ github.ref_name }}
