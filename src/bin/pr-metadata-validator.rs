@@ -255,7 +255,8 @@ async fn validate_pr(
         module_name,
         pr_number,
         pr_assignment_descriptor_id,
-    ).await
+    )
+    .await
 }
 
 // Check the changed files in a pull request match what is expected for that sprint task
@@ -277,8 +278,7 @@ async fn check_pr_file_changes(
 
     let task_issue_body = task_issue.body.unwrap_or_default();
 
-    let directory_description =
-        Regex::new("CHANGE_DIR=(.+)\\n")
+    let directory_description = Regex::new("CHANGE_DIR=(.+)\\n")
         .map_err(|err| Error::UserFacing(format!("Known good regex failed to compile: {}", err)))?;
     let Some(directory_regex_captures) = directory_description.captures(&task_issue_body) else {
         return Ok(ValidationResult::Ok); // There is no match defined for this task, don't do any more checks
@@ -288,14 +288,12 @@ async fn check_pr_file_changes(
         .expect("Regex capture failed to return string match")
         .as_str(); // Only allows a single directory for now
 
-    let directory_matcher = Regex::new(directory_description_regex)
-        .map_err(|err| Error::UserFacing(
-            format!(
-                "Failed to compile regex from {}, check the CHANGE_DIR declaration: {}",
-                task_issue.html_url,
-                err
-            )
-        ))?;
+    let directory_matcher = Regex::new(directory_description_regex).map_err(|err| {
+        Error::UserFacing(format!(
+            "Failed to compile regex from {}, check the CHANGE_DIR declaration: {}",
+            task_issue.html_url, err
+        ))
+    })?;
 
     // Get all of the changed files
     let pr_files = all_pages("changed files in pull request", octocrab, async || {
