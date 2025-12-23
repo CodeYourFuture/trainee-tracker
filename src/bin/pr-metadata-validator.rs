@@ -265,14 +265,10 @@ async fn validate_pr(
     )
     .await
     {
-        Ok(Some(problem)) => return Ok(problem),
-        Ok(None) => (),
-        Err(e) => {
-            let _ = anyhow!(e);
-        }
+        Ok(Some(problem)) => Ok(problem),
+        Ok(None) => Ok(ValidationResult::Ok),
+        Err(err) => Err(err),
     }
-
-    Ok(ValidationResult::Ok)
 }
 
 // Check the changed files in a pull request match what is expected for that sprint task
