@@ -1015,23 +1015,18 @@ pub fn get_descriptor_id_for_pr(
     sprints: &[SprintWithSubmissions],
     target_pr_number: u64,
 ) -> Option<u64> {
-    match sprints
+    sprints
         .iter()
         .flat_map(|sprint_with_subs| sprint_with_subs.submissions.iter())
-        .filter_map(|missing_or_submission| match missing_or_submission {
-            SubmissionState::Some(s) => Some(s),
+        .filter_map(|submission_state| match submission_state {
+            SubmissionState::Some(Submission::PullRequest {
+                pull_request,
+                assignment_issue_id,
+                ..
+            }) if pull_request.number == target_pr_number => Some(*assignment_issue_id),
             _ => None,
         })
-        .find(|submission| match submission {
-            Submission::PullRequest { pull_request, .. } => pull_request.number == target_pr_number,
-            _ => false,
-        }) {
-        Some(Submission::PullRequest {
-            assignment_issue_id,
-            ..
-        }) => Some(*assignment_issue_id),
-        _ => None, // Was called with a nonexistent PR number, can't find an associated assignment
-    }
+        .next()
 }
 
 fn make_title_more_matchable(title: &str) -> IndexSet<String> {
