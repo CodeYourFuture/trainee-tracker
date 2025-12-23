@@ -250,19 +250,13 @@ async fn validate_pr(
     // This should never error, as a PR by this point in code must have been matched
     // with an assignment, and PR assignments must have an associated issue descriptor
 
-    match check_pr_file_changes(
+    check_pr_file_changes(
         octocrab,
         github_org_name,
         module_name,
         pr_number,
         pr_assignment_descriptor_id,
-    )
-    .await
-    {
-        Ok(Some(problem)) => Ok(problem),
-        Ok(None) => Ok(ValidationResult::Ok),
-        Err(err) => Err(err),
-    }
+    ).await
 }
 
 // Check the changed files in a pull request match what is expected for that sprint task
@@ -272,14 +266,14 @@ async fn check_pr_file_changes(
     module_name: &str,
     pr_number: u64,
     task_issue_number: u64,
-) -> Result<Option<ValidationResult>, Error> {
+) -> Result<ValidationResult, Error> {
     // Get the Sprint Task's description of expected changes
     let Ok(task_issue) = octocrab
         .issues(org_name, module_name)
         .get(task_issue_number)
         .await
     else {
-        return Ok(Some(ValidationResult::CouldNotMatch)); // Failed to find the right task
+        return Ok(ValidationResult::CouldNotMatch); // Failed to find the right task
     };
 
     let task_issue_body = task_issue.body.unwrap_or_default();
@@ -287,7 +281,7 @@ async fn check_pr_file_changes(
     let directory_description =
         Regex::new("CHANGE_DIR=(.+)\\n").expect("Known good regex failed to compile");
     let Some(directory_regex_captures) = directory_description.captures(&task_issue_body) else {
-        return Ok(None); // There is no match defined for this task, don't do any more checks
+        return Ok(ValidationResult::Ok); // There is no match defined for this task, don't do any more checks
     };
     let directory_description_regex = directory_regex_captures
         .get(1)
@@ -318,19 +312,19 @@ async fn check_pr_file_changes(
     })
     .await?;
     if pr_files.is_empty() {
-        return Ok(Some(ValidationResult::NoFiles)); // no files committed
+        return Ok(ValidationResult::NoFiles); // no files committed
     }
 
     // check each file and error if one is in unexpected place
     for pr_file in pr_files {
         if !directory_matcher.is_match(&pr_file.filename) {
-            return Ok(Some(ValidationResult::WrongFiles {
+            return Ok(ValidationResult::WrongFiles {
                 expected_files_pattern: directory_description_regex.to_string(),
-            }));
+            });
         }
     }
 
-    Ok(None)
+    Ok(ValidationResult::Ok)
 }
 
 struct KnownRegions(BTreeMap<&'static str, Vec<&'static str>>);
