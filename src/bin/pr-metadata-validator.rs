@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, process::exit};
 
-use anyhow::{Context, anyhow};
 use chrono::NaiveDate;
 use indexmap::IndexMap;
 use maplit::btreemap;
@@ -177,7 +176,7 @@ async fn validate_pr(
         .iter()
         .find(|pr| pr.number == pr_number)
         .ok_or_else(|| {
-            anyhow!(
+            anyhow::anyhow!(
                 "Failed to find PR {} in list of PRs for module {}",
                 pr_number,
                 module_name
@@ -279,7 +278,8 @@ async fn check_pr_file_changes(
     let task_issue_body = task_issue.body.unwrap_or_default();
 
     let directory_description =
-        Regex::new("CHANGE_DIR=(.+)\\n").expect("Known good regex failed to compile");
+        Regex::new("CHANGE_DIR=(.+)\\n")
+        .map_err(|err| Error::UserFacing(format!("Known good regex failed to compile: {}", err)))?;
     let Some(directory_regex_captures) = directory_description.captures(&task_issue_body) else {
         return Ok(ValidationResult::Ok); // There is no match defined for this task, don't do any more checks
     };
@@ -289,13 +289,13 @@ async fn check_pr_file_changes(
         .as_str(); // Only allows a single directory for now
 
     let directory_matcher = Regex::new(directory_description_regex)
-        .with_context(|| {
+        .map_err(|err| Error::UserFacing(
             format!(
-                "Check CHANGE_DIR declaration in issue {}",
-                task_issue.html_url
+                "Failed to compile regex from {}, check the CHANGE_DIR declaration: {}",
+                task_issue.html_url,
+                err
             )
-        })
-        .expect("Failed to compile regex");
+        ))?;
 
     // Get all of the changed files
     let pr_files = all_pages("changed files in pull request", octocrab, async || {
