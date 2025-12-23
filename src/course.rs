@@ -138,6 +138,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Assignment)>, Erro
         labels,
         title,
         html_url,
+        number,
         ..
     } = issue;
 
@@ -209,6 +210,7 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Assignment)>, Erro
             title: title.clone(),
             html_url: html_url.clone(),
             optionality,
+            assignment_issue_id: *number,
         }),
         "Codility" => {
             // TODO: Handle these.
@@ -310,6 +312,7 @@ pub enum Assignment {
     ExpectedPullRequest {
         title: String,
         html_url: Url,
+        assignment_issue_id: u64,
         optionality: AssignmentOptionality,
     },
 }
@@ -436,6 +439,7 @@ impl TraineeWithSubmissions {
                         SubmissionState::Some(Submission::PullRequest {
                             pull_request,
                             optionality,
+                            ..
                         }) => {
                             let max = match optionality {
                                 AssignmentOptionality::Mandatory => 10,
@@ -537,6 +541,7 @@ pub enum Submission {
     PullRequest {
         pull_request: Pr,
         optionality: AssignmentOptionality,
+        assignment_issue_id: u64,
     },
 }
 
@@ -930,6 +935,7 @@ fn match_pr_to_assignment(
         sprint_index: usize,
         assignment_index: usize,
         optionality: AssignmentOptionality,
+        assignment_issue_id: u64,
     }
 
     let mut best_match: Option<Match> = None;
@@ -950,6 +956,7 @@ fn match_pr_to_assignment(
                 Assignment::ExpectedPullRequest {
                     title: expected_title,
                     optionality,
+                    assignment_issue_id,
                     ..
                 } => {
                     let mut assignment_title_words = make_title_more_matchable(expected_title);
@@ -974,6 +981,7 @@ fn match_pr_to_assignment(
                             sprint_index,
                             assignment_index,
                             optionality: optionality.clone(),
+                            assignment_issue_id: *assignment_issue_id,
                         });
                     }
                 }
@@ -981,10 +989,12 @@ fn match_pr_to_assignment(
             }
         }
     }
+
     if let Some(Match {
         sprint_index,
         assignment_index,
         optionality,
+        assignment_issue_id,
         ..
     }) = best_match
     {
@@ -992,10 +1002,31 @@ fn match_pr_to_assignment(
             SubmissionState::Some(Submission::PullRequest {
                 pull_request: pr,
                 optionality,
+                assignment_issue_id,
             });
     } else if !pr.is_closed {
         unknown_prs.push(pr);
     }
+}
+
+// Given a vector of sprints, and a target pr number, for a given person
+// return the issue ID for the associated assignment descriptor
+pub fn get_descriptor_id_for_pr(
+    sprints: &[SprintWithSubmissions],
+    target_pr_number: u64,
+) -> Option<u64> {
+    sprints
+        .iter()
+        .flat_map(|sprint_with_subs| sprint_with_subs.submissions.iter())
+        .filter_map(|submission_state| match submission_state {
+            SubmissionState::Some(Submission::PullRequest {
+                pull_request,
+                assignment_issue_id,
+                ..
+            }) if pull_request.number == target_pr_number => Some(*assignment_issue_id),
+            _ => None,
+        })
+        .next()
 }
 
 fn make_title_more_matchable(title: &str) -> IndexSet<String> {

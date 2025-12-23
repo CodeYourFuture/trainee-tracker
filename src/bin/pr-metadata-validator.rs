@@ -8,9 +8,9 @@ use regex::Regex;
 use trainee_tracker::{
     Error,
     config::{CourseSchedule, CourseScheduleWithRegisterSheetId},
-    course::match_prs_to_assignments,
+    course::{get_descriptor_id_for_pr, match_prs_to_assignments},
     newtypes::Region,
-    octocrab::octocrab_for_token,
+    octocrab::{all_pages, octocrab_for_token},
     pr_comments::{PullRequest, close_existing_comments, leave_tagged_comment},
     prs::get_prs,
 };
@@ -74,6 +74,10 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
+        ValidationResult::WrongFiles {
+            expected_files_pattern,
+        } => &format!("{}`{}`", WRONG_FILES, expected_files_pattern),
+        ValidationResult::NoFiles => NO_FILES,
     };
 
     let full_message = format!(
@@ -131,6 +135,16 @@ const UNKNOWN_REGION_COMMENT: &str = r#"Your PR's title didn't contain a known r
 
 Please check the expected title format, and make sure your region is in the correct place and spelled correctly."#;
 
+const WRONG_FILES: &str = r#"The changed files in this PR don't match what is expected for this task.
+
+Please check that you committed the right files for the task, and that there are no accidentally committed files from other sprints.
+
+Please review the changed files tab at the top of the page, we are only expecting changes in this directory: "#;
+
+const NO_FILES: &str = r#"This PR is missing any submitted files.
+
+Please check that you committed the right files and pushed to the repository"#;
+
 #[derive(strum_macros::Display)]
 enum ValidationResult {
     Ok,
@@ -138,6 +152,8 @@ enum ValidationResult {
     CouldNotMatch,
     BadTitleFormat { reason: String },
     UnknownRegion,
+    WrongFiles { expected_files_pattern: String },
+    NoFiles,
 }
 
 async fn validate_pr(
@@ -226,6 +242,78 @@ async fn validate_pr(
         || pr_in_question.body.contains("- [ ]")
     {
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
+    }
+
+    let pr_assignment_descriptor_id =
+        get_descriptor_id_for_pr(&matched.sprints, pr_number).expect("This PR does not exist");
+    // This should never error, as a PR by this point in code must have been matched
+    // with an assignment, and PR assignments must have an associated issue descriptor
+
+    check_pr_file_changes(
+        octocrab,
+        github_org_name,
+        module_name,
+        pr_number,
+        pr_assignment_descriptor_id,
+    )
+    .await
+}
+
+// Check the changed files in a pull request match what is expected for that sprint task
+async fn check_pr_file_changes(
+    octocrab: &Octocrab,
+    org_name: &str,
+    module_name: &str,
+    pr_number: u64,
+    task_issue_number: u64,
+) -> Result<ValidationResult, Error> {
+    // Get the Sprint Task's description of expected changes
+    let Ok(task_issue) = octocrab
+        .issues(org_name, module_name)
+        .get(task_issue_number)
+        .await
+    else {
+        return Ok(ValidationResult::CouldNotMatch); // Failed to find the right task
+    };
+
+    let task_issue_body = task_issue.body.unwrap_or_default();
+
+    let directory_description = Regex::new("CHANGE_DIR=(.+)\\n")
+        .map_err(|err| Error::UserFacing(format!("Known good regex failed to compile: {}", err)))?;
+    let Some(directory_regex_captures) = directory_description.captures(&task_issue_body) else {
+        return Ok(ValidationResult::Ok); // There is no match defined for this task, don't do any more checks
+    };
+    let directory_description_regex = directory_regex_captures
+        .get(1)
+        .expect("Regex capture failed to return string match")
+        .as_str(); // Only allows a single directory for now
+
+    let directory_matcher = Regex::new(directory_description_regex).map_err(|err| {
+        Error::UserFacing(format!(
+            "Failed to compile regex from {}, check the CHANGE_DIR declaration: {}",
+            task_issue.html_url, err
+        ))
+    })?;
+
+    // Get all of the changed files
+    let pr_files = all_pages("changed files in pull request", octocrab, async || {
+        octocrab
+            .pulls(org_name, module_name)
+            .list_files(pr_number)
+            .await
+    })
+    .await?;
+    if pr_files.is_empty() {
+        return Ok(ValidationResult::NoFiles); // no files committed
+    }
+
+    // check each file and error if one is in unexpected place
+    for pr_file in pr_files {
+        if !directory_matcher.is_match(&pr_file.filename) {
+            return Ok(ValidationResult::WrongFiles {
+                expected_files_pattern: directory_description_regex.to_string(),
+            });
+        }
     }
 
     Ok(ValidationResult::Ok)
