@@ -47,7 +47,7 @@ async fn main() {
     let session_store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(session_store)
         .with_secure(is_secure)
-        .with_expiry(Expiry::OnSessionEnd);
+        .with_expiry(Expiry::OnInactivity(time::Duration::HOUR));
 
     let app = axum::Router::new()
         .route("/api/ok", get(trainee_tracker::endpoints::health_check))
@@ -110,6 +110,10 @@ async fn main() {
         .route(
             "/api/attendance",
             get(trainee_tracker::endpoints::fetch_attendance),
+        )
+        .route(
+            "/api/expected-attendance",
+            get(trainee_tracker::endpoints::expected_attendance),
         )
         .layer(session_layer)
         .with_state(server_state);

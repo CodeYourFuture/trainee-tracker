@@ -12,6 +12,7 @@ use trainee_tracker::{
     course::{get_descriptor_id_for_pr, match_prs_to_assignments},
     newtypes::Region,
     octocrab::{all_pages, octocrab_for_token},
+    pr_comments::{PullRequest, close_existing_comments, leave_tagged_comment},
     prs::get_prs,
 };
 
@@ -19,30 +20,11 @@ const ARBITRARY_REGION: Region = Region(String::new());
 
 #[tokio::main]
 async fn main() {
-    let Ok([_argv0, pr_url]) = <[_; 2]>::try_from(std::env::args().collect::<Vec<_>>()) else {
+    let Ok([_argv0, pr_url]) = <[_; _]>::try_from(std::env::args().collect::<Vec<_>>()) else {
         eprintln!("Expected one arg - PR URL");
         exit(1);
     };
-    let pr_parts: Vec<_> = pr_url.split("/").collect();
-    let (github_org_name, module_name, pr_number) = match pr_parts.as_slice() {
-        [
-            _http,
-            _scheme,
-            _domain,
-            github_org_name,
-            module_name,
-            _pull,
-            number,
-        ] => (
-            (*github_org_name).to_owned(),
-            (*module_name).to_owned(),
-            number.parse::<u64>().expect("Failed to parse PR number"),
-        ),
-        _ => {
-            eprintln!("Failed to parse PR URL");
-            exit(1);
-        }
-    };
+    let pr = PullRequest::from_html_url(&pr_url).expect("Failed to parse PR URL");
 
     // TODO: Fetch this from classplanner or somewhere when we have access to a useful API.
     let known_region_aliases = KnownRegions(btreemap! {
@@ -58,7 +40,7 @@ async fn main() {
         std::env::var("GH_TOKEN").expect("GH_TOKEN wasn't set - must be set to a GitHub API token");
     let octocrab = octocrab_for_token(github_token).expect("Failed to get octocrab");
 
-    let course_schedule = make_fake_course_schedule(module_name.clone());
+    let course_schedule = make_fake_course_schedule(pr.repo.clone());
 
     let course = CourseScheduleWithRegisterSheetId {
         name: "itp".to_owned(),
@@ -68,15 +50,23 @@ async fn main() {
     let result = validate_pr(
         &octocrab,
         course,
-        &module_name,
-        &github_org_name,
-        pr_number,
+        &pr.repo,
+        &pr.org,
+        pr.number,
         &known_region_aliases,
     )
     .await
     .expect("Failed to validate PR");
-    let message = match result {
+
+    const PR_METADATA_VALIDATOR_LABEL: &str = "pr-metadata-validator";
+
+    let message = match &result {
         ValidationResult::Ok => {
+            if let Err(err) =
+                close_existing_comments(&octocrab, &pr, PR_METADATA_VALIDATOR_LABEL).await
+            {
+                eprintln!("Failed to close existing comments: {:?}", err);
+            }
             exit(0);
         }
         ValidationResult::CouldNotMatch => COULD_NOT_MATCH_COMMENT,
@@ -95,26 +85,29 @@ async fn main() {
         "{message}\n\nIf this PR is not coursework, please add the NotCoursework label (and message on Slack in #cyf-curriculum or it will probably not be noticed).\n\nIf this PR needs reviewed, please add the 'Needs Review' label to this PR after you have resolved the issues listed above."
     );
     eprintln!("{}", full_message);
-    octocrab
-        .issues(&github_org_name, &module_name)
-        .create_comment(pr_number, full_message)
-        .await
-        .expect("Failed to create comment with validation error");
+    leave_tagged_comment(
+        &octocrab,
+        &pr,
+        &[PR_METADATA_VALIDATOR_LABEL, &result.to_string()],
+        full_message,
+    )
+    .await
+    .expect("Failed to create comment with validation error");
     let remove_label_response = octocrab
-        .issues(&github_org_name, &module_name)
-        .remove_label(pr_number, "Needs Review")
+        .issues(&pr.org, &pr.repo)
+        .remove_label(pr.number, "Needs Review")
         .await;
     match remove_label_response {
         Ok(_) => {
             println!(
                 "Found issues for PR #{}, notified and removed label",
-                pr_number
+                pr.number
             );
         }
         Err(octocrab::Error::GitHub { source, .. }) if source.status_code == 404 => {
             println!(
                 "Found issues for PR #{}, notified and label already removed",
-                pr_number
+                pr.number
             );
             // The only time this API 404s is if the label is already removed. Continue without error.
         }
@@ -153,6 +146,7 @@ const NO_FILES: &str = r#"This PR is missing any submitted files.
 
 Please check that you committed the right files and pushed to the repository"#;
 
+#[derive(strum_macros::Display)]
 enum ValidationResult {
     Ok,
     BodyTemplateNotFilledOut,

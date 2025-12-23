@@ -16,8 +16,7 @@ use crate::{
     sheets::SheetsClient,
 };
 use anyhow::Context;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use chrono_tz::Tz;
+use chrono::{NaiveDate, Utc};
 use email_address::EmailAddress;
 use futures::future::join_all;
 use indexmap::{IndexMap, IndexSet};
@@ -123,16 +122,14 @@ impl CourseScheduleWithRegisterSheetId {
                         sprints.len()
                     )));
                 }
-                if let Some(assignment) = assignment {
-                    sprints[sprint_index].push(assignment);
-                }
+                sprints[sprint_index].push(assignment);
             }
         }
         Ok(sprints)
     }
 }
 
-fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>)>, Error> {
+fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Assignment)>, Error> {
     if issue.pull_request.is_some() {
         return Ok(None);
     }
@@ -145,22 +142,16 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
         ..
     } = issue;
 
-    let mut sprint = None;
+    let mut sprints = Vec::new();
 
     let mut submit_label = None;
     let mut optionality = None;
 
     for label in labels {
         if let Some(sprint_number) = label.name.strip_prefix("📅 Sprint ") {
-            if sprint.is_some() {
-                return Err(Error::UserFacing(format!(
-                    "Failed to parse issue {} - duplicate sprint labels",
-                    html_url
-                )));
-            }
             match NonZeroUsize::from_str(sprint_number) {
                 Ok(sprint_number) => {
-                    sprint = Some(sprint_number);
+                    sprints.push(sprint_number);
                 }
                 Err(_err) => {
                     return Err(Error::UserFacing(format!(
@@ -199,20 +190,11 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
         }
     }
 
-    let sprint = sprint.ok_or_else(|| {
-        Error::UserFacing(format!(
-            "Failed to parse issue {} - no sprint label.{}",
-            html_url, BAD_LABEL_SUFFIX,
-        ))
-    })?;
-
-    let submit_label = match submit_label {
-        Some(submit_label) => submit_label,
-        // TODO: For now we treat a missing Submit label as an issue to ignore.
-        // When all issues have Submit labels, we should error if they're missing.
-        None => {
-            return Ok(Some((sprint, None)));
-        }
+    let Some(submit_label) = submit_label else {
+        return Err(Error::UserFacing(format!(
+            "Failed to parse issue {} - no submit label.{}",
+            html_url, BAD_LABEL_SUFFIX
+        )));
     };
 
     let optionality = optionality.ok_or_else(|| {
@@ -246,6 +228,22 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Option<Assignment>
             return Err(Error::UserFacing(format!(
                 "Failed to parse issue {} - submit label wasn't recognised: {}",
                 html_url, other
+            )));
+        }
+    };
+
+    let Some(assignment) = assignment else {
+        return Ok(None);
+    };
+
+    let sprint = match sprints.as_slice() {
+        [sprint] => *sprint,
+        // If empty, or more than one value:
+        empty_or_more_than_one => {
+            return Err(Error::UserFacing(format!(
+                "Failed to parse issue {} - expected exactly one sprint label but got {}",
+                html_url,
+                empty_or_more_than_one.len()
             )));
         }
     };
@@ -805,14 +803,7 @@ fn get_trainee_module_attendance(
                     .collect::<Vec<chrono::NaiveDate>>();
                 let attendance = match dates.as_slice() {
                     [date] => {
-                        let start_time = DateTime::<Tz>::from_naive_utc_and_offset(
-                            NaiveDateTime::new(
-                                date.clone(),
-                                NaiveTime::from_hms_opt(10, 00, 00).expect("TODO"),
-                            ),
-                            region.timezone().offset_from_utc_date(date),
-                        )
-                        .to_utc();
+                        let start_time = region.class_start_time(date);
                         let attendance = module_attendance
                             .attendance
                             .get(sprint_index)

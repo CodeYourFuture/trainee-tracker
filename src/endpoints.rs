@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, ops::AddAssign};
 
 use ::octocrab::models::{Author, teams::RequestedTeam};
 use anyhow::Context;
@@ -7,6 +7,7 @@ use axum::{
     extract::{OriginalUri, Path, State},
     response::IntoResponse,
 };
+use chrono::Utc;
 use futures::future::join_all;
 use http::HeaderMap;
 use indexmap::IndexMap;
@@ -218,14 +219,13 @@ pub async fn get_region(
     }))
 }
 
-type SprintAttendance = BTreeMap<String, Vec<Attendance>>;
-type ModuleAttendance = BTreeMap<String, SprintAttendance>;
-type BatchAttendance = BTreeMap<String, ModuleAttendance>;
-type CourseAttendance = BTreeMap<String, BatchAttendance>;
-
 #[derive(Serialize)]
 pub struct AttendanceResponse {
-    courses: CourseAttendance,
+    #[serde(flatten)]
+    attendance: Attendance,
+    sprint: String,
+    module: String,
+    batch: String,
 }
 
 pub async fn fetch_attendance(
@@ -233,7 +233,7 @@ pub async fn fetch_attendance(
     headers: HeaderMap,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
-) -> Result<Json<AttendanceResponse>, Error> {
+) -> Result<Json<Vec<AttendanceResponse>>, Error> {
     let all_courses = &server_state.config.courses;
     let sheets_client = sheets_client(
         &session,
@@ -243,7 +243,6 @@ pub async fn fetch_attendance(
     )
     .await?;
 
-    let mut courses: CourseAttendance = BTreeMap::new();
     let mut register_futures = Vec::new();
     for (course_name, course_info) in all_courses {
         for batch_name in course_info.batches.keys() {
@@ -268,32 +267,67 @@ pub async fn fetch_attendance(
     }
     let register_info = join_all(register_futures).await;
 
-    for (course_name, batch_name, register_result) in register_info {
+    let mut registered_attendance = Vec::new();
+
+    for (_course_name, batch_name, register_result) in register_info {
         let register = register_result?;
-        let modules = register
-            .modules
-            .into_iter()
-            .map(|(module_name, sprint_info)| {
-                (
-                    module_name,
-                    sprint_info
-                        .attendance
-                        .into_iter()
-                        .enumerate()
-                        .map(|(sprint_number, sprint_info)| {
-                            (
-                                format!("Sprint-{}", sprint_number + 1),
-                                sprint_info.into_values().collect(),
-                            )
-                        })
-                        .collect(),
-                )
-            })
-            .collect();
-        courses
-            .entry(course_name)
-            .or_default()
-            .insert(batch_name, modules);
+        for (module_name, sprint_info) in register.modules {
+            for (sprint_number, attendance_info) in sprint_info.attendance.iter().enumerate() {
+                let sprint_name = format!("Sprint-{}", sprint_number + 1);
+                for attendance in attendance_info.values() {
+                    registered_attendance.push(AttendanceResponse {
+                        attendance: attendance.clone(),
+                        sprint: sprint_name.clone(),
+                        module: module_name.clone(),
+                        batch: batch_name.clone(),
+                    });
+                }
+            }
+        }
     }
-    Ok(Json(AttendanceResponse { courses }))
+    Ok(Json(registered_attendance))
+}
+
+#[derive(Serialize)]
+pub struct ExpectedAttendance {
+    course: String,
+    cohort: String,
+    region: crate::newtypes::Region,
+    expected_classes: usize,
+}
+
+pub async fn expected_attendance(
+    State(server_state): State<ServerState>,
+) -> Json<Vec<ExpectedAttendance>> {
+    let now = Utc::now();
+
+    let mut expected_attendance = Vec::new();
+    for (course, course_info) in server_state.config.courses {
+        for (cohort, schedule) in course_info.batches {
+            let mut region_to_expected_classes: BTreeMap<crate::newtypes::Region, usize> =
+                BTreeMap::new();
+            for (_module_name, sprints) in schedule.sprints {
+                for sprint in sprints {
+                    for (region, date) in sprint {
+                        let start_time = region.class_start_time(&date);
+                        if start_time < now {
+                            region_to_expected_classes
+                                .entry(region)
+                                .or_default()
+                                .add_assign(1);
+                        }
+                    }
+                }
+            }
+            for (region, expected_classes) in region_to_expected_classes {
+                expected_attendance.push(ExpectedAttendance {
+                    course: course.clone(),
+                    cohort: cohort.clone(),
+                    region,
+                    expected_classes,
+                })
+            }
+        }
+    }
+    Json(expected_attendance)
 }
