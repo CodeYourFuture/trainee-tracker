@@ -285,12 +285,6 @@ async fn check_pr_file_changes(
     };
     let directory_description_regex = directory_regex_captures
         .get(1)
-        .with_context(|| {
-            format!(
-                "Check CHANGE_DIR declaration in issue {}",
-                task_issue.html_url
-            )
-        })
         .expect("Regex capture failed to return string match")
         .as_str(); // Only allows a single directory for now
 
