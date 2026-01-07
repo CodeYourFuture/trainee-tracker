@@ -309,6 +309,9 @@ async fn check_pr_file_changes(
 
     // check each file and error if one is in unexpected place
     for pr_file in pr_files {
+        if pr_file.filename == ".gitignore" {
+            continue; // always allow top-level gitignore changes
+        }
         if !directory_matcher.is_match(&pr_file.filename) {
             return Ok(ValidationResult::WrongFiles {
                 expected_files_pattern: directory_description_regex.to_string(),
