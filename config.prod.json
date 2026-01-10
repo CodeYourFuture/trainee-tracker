@@ -247,7 +247,7 @@
           }
         },
         "2026-jan-itp": {
-          "start": "2026-01-10",
+          "start": "2026-01-01",
           "end": "2026-04-30",
           "sprints": {
             "Module-Welcome": [
