@@ -583,14 +583,6 @@
             ],
             "Module-Decomposition": [
               {
-                "Glasgow": "2025-12-20",
-                "London": "2025-12-20",
-                "North West": "2025-12-20",
-                "Sheffield": "2025-12-20",
-                "South Africa": "2025-12-20",
-                "West Midlands": "2025-12-20"
-              },
-              {
                 "Glasgow": "2026-01-10",
                 "London": "2026-01-10",
                 "North West": "2026-01-10",
@@ -605,9 +597,7 @@
                 "Sheffield": "2026-01-17",
                 "South Africa": "2026-01-17",
                 "West Midlands": "2026-01-17"
-              }
-            ],
-            "Module-Legacy-Code": [
+              },
               {
                 "Glasgow": "2026-01-24",
                 "London": "2026-01-24",
@@ -615,6 +605,16 @@
                 "Sheffield": "2026-01-24",
                 "South Africa": "2026-01-24",
                 "West Midlands": "2026-01-24"
+              }
+            ],
+            "Module-Legacy-Code": [
+              {
+                "Glasgow": "2026-01-31",
+                "London": "2026-01-31",
+                "North West": "2026-01-31",
+                "Sheffield": "2026-01-31",
+                "South Africa": "2026-01-31",
+                "West Midlands": "2026-01-31"
               }
             ],
             "Module-Complexity": [
