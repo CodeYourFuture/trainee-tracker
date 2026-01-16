@@ -1,4 +1,4 @@
-use axum::routing::get;
+use axum::routing::{get, post};
 use dotenv::dotenv;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use tracing::info;
@@ -114,6 +114,10 @@ async fn main() {
         .route(
             "/api/expected-attendance",
             get(trainee_tracker::endpoints::expected_attendance),
+        )
+        .route(
+            "/codility/verify-webhook",
+            post(trainee_tracker::codility::verify_webhook),
         )
         .layer(session_layer)
         .with_state(server_state);

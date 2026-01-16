@@ -14,6 +14,7 @@ pub mod config;
 pub use config::Config;
 
 use crate::google_auth::GoogleScope;
+pub mod codility;
 pub mod course;
 pub mod endpoints;
 pub mod frontend;
