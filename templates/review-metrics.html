@@ -10,7 +10,7 @@
         }
         .stats-container {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 40px;
         }
         .reviews-container {
@@ -20,6 +20,12 @@
         }
         .review-card {
             border: 1px black solid;
+            padding: 5px;
+        }
+        .module {
+            background-color: lightgrey;
+            border: 1px black solid;
+            margin-bottom: 10px;
             padding: 5px;
         }
         </style>
@@ -51,46 +57,67 @@
                     <li>p100: {{format_duration(aggregate_metrics.p100_needs_review_to_complete)}}</li>
                 </ul>
             </div>
+            <div class="stats-card">
+                <h3>Iterations</h3>
+                <ul>
+                    {% for (iteration, count) in aggregate_metrics.iteration_counts %}
+                        <li>{{iteration}}: {{count}} PRs</li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
 
         {% for module in modules %}
-            <h2>{{module.name}}</h2>
-            <div class="stats-container">
-                <div class="stats-card">
-                    <h3>Needs review to first review</h3>
-                    <ul>
-                        <li>p50: {{format_duration(module.aggregate_metrics.p50_needs_review_to_first_review)}}</li>
-                        <li>p90: {{format_duration(module.aggregate_metrics.p90_needs_review_to_first_review)}}</li>
-                        <li>p100: {{format_duration(module.aggregate_metrics.p100_needs_review_to_first_review)}}</li>
-                    </ul>
-                </div>
-                <div class="stats-card">
-                    <h3>Created to complete</h3>
-                    <ul>
-                        <li>p50: {{format_duration(module.aggregate_metrics.p50_created_to_complete)}}</li>
-                        <li>p90: {{format_duration(module.aggregate_metrics.p90_created_to_complete)}}</li>
-                        <li>p100: {{format_duration(module.aggregate_metrics.p100_created_to_complete)}}</li>
-                    </ul>
-                </div>
-                <div class="stats-card">
-                    <h3>Needs review to complete</h3>
-                    <ul>
-                        <li>p50: {{format_duration(module.aggregate_metrics.p50_needs_review_to_complete)}}</li>
-                        <li>p90: {{format_duration(module.aggregate_metrics.p90_needs_review_to_complete)}}</li>
-                        <li>p100: {{format_duration(module.aggregate_metrics.p100_needs_review_to_complete)}}</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="reviews-container">
-                {% for pr in module.metrics %}
-                    <div class="review-card">
-                        <div><a href="{{pr.pr.url}}">{{pr.pr.repo_name}} #{{pr.pr.number}}</a></div>
-                        <div>Created to Complete: {{format_duration(&pr.created_to_complete())}}</div>
-                        <div>Needs Review to Complete: {{format_duration(&pr.needs_review_to_complete())}}</div>
-                        <div>{{pr.iterations}} iterations</div>
-                        <div>Time since created: {{format_duration(&Some(pr.time_since_created()))}}</div>
+            <div class="module">
+                <h2>{{module.name}}</h2>
+                <details>
+                    <summary>Expand for details</summary>
+                    <div class="stats-container">
+                        <div class="stats-card">
+                            <h3>Needs review to first review</h3>
+                            <ul>
+                                <li>p50: {{format_duration(module.aggregate_metrics.p50_needs_review_to_first_review)}}</li>
+                                <li>p90: {{format_duration(module.aggregate_metrics.p90_needs_review_to_first_review)}}</li>
+                                <li>p100: {{format_duration(module.aggregate_metrics.p100_needs_review_to_first_review)}}</li>
+                            </ul>
+                        </div>
+                        <div class="stats-card">
+                            <h3>Created to complete</h3>
+                            <ul>
+                                <li>p50: {{format_duration(module.aggregate_metrics.p50_created_to_complete)}}</li>
+                                <li>p90: {{format_duration(module.aggregate_metrics.p90_created_to_complete)}}</li>
+                                <li>p100: {{format_duration(module.aggregate_metrics.p100_created_to_complete)}}</li>
+                            </ul>
+                        </div>
+                        <div class="stats-card">
+                            <h3>Needs review to complete</h3>
+                            <ul>
+                                <li>p50: {{format_duration(module.aggregate_metrics.p50_needs_review_to_complete)}}</li>
+                                <li>p90: {{format_duration(module.aggregate_metrics.p90_needs_review_to_complete)}}</li>
+                                <li>p100: {{format_duration(module.aggregate_metrics.p100_needs_review_to_complete)}}</li>
+                            </ul>
+                        </div>
+                        <div class="stats-card">
+                            <h3>Iterations</h3>
+                            <ul>
+                                {% for (iteration, count) in module.aggregate_metrics.iteration_counts %}
+                                    <li>{{iteration}}: {{count}} PRs</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
                     </div>
-                {% endfor %}
+                    <div class="reviews-container">
+                        {% for pr in module.metrics %}
+                            <div class="review-card">
+                                <div><a href="{{pr.pr.url}}">{{pr.pr.repo_name}} #{{pr.pr.number}}</a></div>
+                                <div>Created to Complete: {{format_duration(&pr.created_to_complete())}}</div>
+                                <div>Needs Review to Complete: {{format_duration(&pr.needs_review_to_complete())}}</div>
+                                <div>{{pr.iterations}} iterations</div>
+                                <div>Time since created: {{format_duration(&Some(pr.time_since_created()))}}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </details>
             </div>
         {% endfor %}
     </body>
