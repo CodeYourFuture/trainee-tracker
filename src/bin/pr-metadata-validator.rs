@@ -78,6 +78,7 @@ async fn main() {
             expected_files_pattern,
         } => &format!("{}`{}`", WRONG_FILES, expected_files_pattern),
         ValidationResult::NoFiles => NO_FILES,
+        ValidationResult::TooManyFiles => TOO_MANY_FILES,
     };
 
     let full_message = format!(
@@ -145,6 +146,10 @@ const NO_FILES: &str = r#"This PR is missing any submitted files.
 
 Please check that you committed the right files and pushed to the repository"#;
 
+const TOO_MANY_FILES: &str = r#"There are too many files comitted in this pull request.
+
+Please check and make sure you have not accidentally comitted a cache, virtual environment, or npm package directory."#;
+
 #[derive(strum_macros::Display)]
 enum ValidationResult {
     Ok,
@@ -154,6 +159,7 @@ enum ValidationResult {
     UnknownRegion,
     WrongFiles { expected_files_pattern: String },
     NoFiles,
+    TooManyFiles,
 }
 
 async fn validate_pr(
@@ -305,6 +311,10 @@ async fn check_pr_file_changes(
     .await?;
     if pr_files.is_empty() {
         return Ok(ValidationResult::NoFiles); // no files committed
+    }
+
+    if pr_files.len() > 100 {
+        return Ok(ValidationResult::TooManyFiles); // too many files probably a venv or npm cache
     }
 
     // check each file and error if one is in unexpected place
