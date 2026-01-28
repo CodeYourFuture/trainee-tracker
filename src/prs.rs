@@ -251,6 +251,8 @@ pub struct AggregatePrMetrics {
     pub p50_needs_review_to_complete: Option<TimeDelta>,
     pub p90_needs_review_to_complete: Option<TimeDelta>,
     pub p100_needs_review_to_complete: Option<TimeDelta>,
+
+    pub iteration_counts: BTreeMap<usize, usize>,
 }
 
 impl AggregatePrMetrics {
@@ -276,6 +278,13 @@ impl AggregatePrMetrics {
             m.needs_review_to_complete()
         });
 
+        let mut iteration_counts = BTreeMap::new();
+        for metric in metrics {
+            if metric.first_complete.is_some() {
+                *iteration_counts.entry(metric.iterations).or_default() += 1;
+            }
+        }
+
         AggregatePrMetrics {
             p50_needs_review_to_first_review,
             p90_needs_review_to_first_review,
@@ -286,6 +295,7 @@ impl AggregatePrMetrics {
             p50_needs_review_to_complete,
             p90_needs_review_to_complete,
             p100_needs_review_to_complete,
+            iteration_counts,
         }
     }
 
