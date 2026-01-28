@@ -5,12 +5,14 @@ use chrono::{DateTime, TimeDelta};
 use futures::future::join_all;
 use octocrab::Octocrab;
 use octocrab::models::pulls::{Comment, PullRequest, Review as OctoReview};
-use octocrab::models::{Author, IssueState};
+use octocrab::models::timelines::TimelineEvent;
+use octocrab::models::{Author, Event, IssueState};
 use octocrab::params::State;
 use serde::Serialize;
 
 use crate::Error;
 use crate::newtypes::GithubLogin;
+use crate::octocrab::all_pages;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Pr {
@@ -21,6 +23,7 @@ pub struct Pr {
     pub author: GithubLogin,
     pub body: String,
     pub state: PrState,
+    pub created_at: DateTime<chrono::Utc>,
     pub updated_at: DateTime<chrono::Utc>,
     pub is_closed: bool,
     pub labels: BTreeSet<String>,
@@ -89,6 +92,7 @@ pub async fn get_prs(
                  number,
                  user,
                  labels,
+                 created_at,
                  updated_at,
                  title,
                  state,
@@ -116,6 +120,7 @@ pub async fn get_prs(
 
                 // Unclear when they API would return None for these, ignore them.
                 let updated_at = updated_at?;
+                let created_at = created_at?;
                 let url = html_url?.to_string();
                 let title = title?;
                 let body = body.unwrap_or_default();
@@ -125,6 +130,7 @@ pub async fn get_prs(
                     url,
                     author,
                     state: pr_state,
+                    created_at,
                     updated_at,
                     repo_name,
                     title,
@@ -230,6 +236,154 @@ pub(crate) struct ReviewerInfo {
     pub login: GithubLogin,
     pub reviews_days_in_last_28_days: u8,
     pub staff_only_details: MaybeReviewerStaffOnlyDetails,
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize)]
+pub struct AggregatePrMetrics {
+    pub p50_needs_review_to_first_review: Option<TimeDelta>,
+    pub p90_needs_review_to_first_review: Option<TimeDelta>,
+    pub p100_needs_review_to_first_review: Option<TimeDelta>,
+
+    pub p50_created_to_complete: Option<TimeDelta>,
+    pub p90_created_to_complete: Option<TimeDelta>,
+    pub p100_created_to_complete: Option<TimeDelta>,
+
+    pub p50_needs_review_to_complete: Option<TimeDelta>,
+    pub p90_needs_review_to_complete: Option<TimeDelta>,
+    pub p100_needs_review_to_complete: Option<TimeDelta>,
+}
+
+impl AggregatePrMetrics {
+    pub(crate) fn new(metrics: &[PrMetrics]) -> AggregatePrMetrics {
+        let (
+            p50_needs_review_to_first_review,
+            p90_needs_review_to_first_review,
+            p100_needs_review_to_first_review,
+        ) = AggregatePrMetrics::calculate_precentiles(&metrics, |m: &PrMetrics| {
+            m.needs_review_to_first_review()
+        });
+
+        let (p50_created_to_complete, p90_created_to_complete, p100_created_to_complete) =
+            AggregatePrMetrics::calculate_precentiles(&metrics, |m: &PrMetrics| {
+                m.created_to_complete()
+            });
+
+        let (
+            p50_needs_review_to_complete,
+            p90_needs_review_to_complete,
+            p100_needs_review_to_complete,
+        ) = AggregatePrMetrics::calculate_precentiles(&metrics, |m: &PrMetrics| {
+            m.needs_review_to_complete()
+        });
+
+        AggregatePrMetrics {
+            p50_needs_review_to_first_review,
+            p90_needs_review_to_first_review,
+            p100_needs_review_to_first_review,
+            p50_created_to_complete,
+            p90_created_to_complete,
+            p100_created_to_complete,
+            p50_needs_review_to_complete,
+            p90_needs_review_to_complete,
+            p100_needs_review_to_complete,
+        }
+    }
+
+    fn calculate_precentiles<F: Fn(&PrMetrics) -> Option<TimeDelta>>(
+        metrics: &[PrMetrics],
+        f: F,
+    ) -> (Option<TimeDelta>, Option<TimeDelta>, Option<TimeDelta>) {
+        let p: inc_stats::Percentiles<f64> = metrics
+            .iter()
+            .filter_map(f)
+            .map(|m| m.as_seconds_f64())
+            .collect();
+        if let Some(v) = p.percentiles([0.5, 0.9, 1.0]).unwrap() {
+            (
+                Some(TimeDelta::seconds(v[0] as i64)),
+                Some(TimeDelta::seconds(v[1] as i64)),
+                Some(TimeDelta::seconds(v[2] as i64)),
+            )
+        } else {
+            (None, None, None)
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PrMetrics {
+    pub pr: Pr,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub label_add_events: Vec<LabelAddEvent>,
+
+    pub first_needs_review: Option<chrono::DateTime<chrono::Utc>>,
+    pub first_reviewed: Option<chrono::DateTime<chrono::Utc>>,
+    pub first_complete: Option<chrono::DateTime<chrono::Utc>>,
+    pub iterations: usize,
+}
+
+impl PrMetrics {
+    fn new(
+        pr: Pr,
+        created_at: chrono::DateTime<chrono::Utc>,
+        label_add_events: Vec<LabelAddEvent>,
+    ) -> PrMetrics {
+        let mut first_needs_review = None;
+        let mut first_reviewed = None;
+        let mut first_complete = None;
+        let mut iterations = 0;
+
+        for event in &label_add_events {
+            if event.label == "Needs Review" {
+                if first_needs_review.is_none() {
+                    first_needs_review = Some(event.time);
+                }
+            } else if event.label == "Reviewed" {
+                iterations += 1;
+                if first_reviewed.is_none() {
+                    first_reviewed = Some(event.time);
+                }
+            } else if event.label == "Complete" {
+                iterations += 1;
+                if first_complete.is_none() {
+                    first_complete = Some(event.time);
+                }
+            }
+        }
+
+        PrMetrics {
+            pr,
+            created_at,
+            label_add_events,
+            first_needs_review,
+            first_reviewed,
+            first_complete,
+            iterations,
+        }
+    }
+
+    pub(crate) fn needs_review_to_first_review(&self) -> Option<TimeDelta> {
+        Some(self.first_complete? - self.created_at)
+    }
+
+    pub(crate) fn created_to_complete(&self) -> Option<TimeDelta> {
+        Some(self.first_complete? - self.created_at)
+    }
+
+    pub(crate) fn needs_review_to_complete(&self) -> Option<TimeDelta> {
+        Some(self.first_complete? - self.first_needs_review?)
+    }
+
+    pub(crate) fn time_since_created(&self) -> TimeDelta {
+        chrono::Utc::now() - self.created_at
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LabelAddEvent {
+    pub actor: GithubLogin,
+    pub label: String,
+    pub time: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(PartialEq, Eq, Serialize)]
@@ -355,6 +509,53 @@ pub(crate) async fn get_reviewers(
 enum CommentsOrReviews {
     Comments,
     Reviews,
+}
+
+pub(crate) async fn get_review_metrics(
+    octocrab: &Octocrab,
+    github_org: &str,
+    pr: Pr,
+) -> Result<PrMetrics, Error> {
+    let events = all_pages("timeline events", octocrab, async || {
+        octocrab
+            .issues(github_org, &pr.repo_name)
+            .list_timeline_events(pr.number)
+            .send()
+            .await
+    })
+    .await?;
+    let label_add_events = events
+        .into_iter()
+        .filter_map(
+            |TimelineEvent {
+                 event,
+                 actor,
+                 label,
+                 created_at,
+                 ..
+             }| {
+                if event != Event::Labeled {
+                    return None;
+                }
+                let Some(label) = label else {
+                    return None;
+                };
+                let Some(created_at) = created_at else {
+                    return None;
+                };
+                let Some(actor) = actor else {
+                    return None;
+                };
+                Some(LabelAddEvent {
+                    actor: GithubLogin::from(actor.login),
+                    label: label.name,
+                    time: created_at,
+                })
+            },
+        )
+        .collect();
+    let created_at = pr.created_at;
+    Ok(PrMetrics::new(pr, created_at, label_add_events))
 }
 
 // Ideally this would be a more general shared function, but async closures aren't super stable yet.

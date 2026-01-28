@@ -96,6 +96,10 @@ async fn main() {
             get(trainee_tracker::frontend::get_reviewers),
         )
         .route(
+            "/courses/{course}/review-metrics",
+            get(trainee_tracker::frontend::get_review_metrics),
+        )
+        .route(
             "/groups/google",
             get(trainee_tracker::frontend::list_google_groups),
         )

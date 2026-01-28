@@ -6,6 +6,7 @@ use axum::{
     extract::{OriginalUri, Path, Query, State},
     response::{Html, IntoResponse, Response},
 };
+use chrono::TimeDelta;
 use futures::future::join_all;
 use http::{HeaderMap, StatusCode, Uri, header::CONTENT_TYPE};
 use serde::Deserialize;
@@ -20,7 +21,10 @@ use crate::{
     },
     google_groups::{GoogleGroup, get_groups, groups_client},
     octocrab::octocrab,
-    prs::{MaybeReviewerStaffOnlyDetails, PrState, ReviewerInfo},
+    prs::{
+        AggregatePrMetrics, MaybeReviewerStaffOnlyDetails, PrMetrics, PrState, ReviewerInfo,
+        get_prs,
+    },
     reviewer_staff_info::get_reviewer_staff_info,
     sheets::sheets_client,
     slack::list_groups_with_members,
@@ -256,6 +260,93 @@ struct ReviewersTemplate {
     pub course: String,
     pub reviewers: BTreeSet<ReviewerInfo>,
     pub now: chrono::DateTime<chrono::Utc>,
+}
+
+pub async fn get_review_metrics(
+    session: Session,
+    State(server_state): State<ServerState>,
+    OriginalUri(original_uri): OriginalUri,
+    Path(course_name): Path<String>,
+) -> Result<Html<String>, Error> {
+    let module_names = server_state
+        .config
+        .get_course_module_names(&course_name)
+        .ok_or(Error::UserFacing("Unknown course".to_owned()))?;
+
+    let octocrab = octocrab(&session, &server_state, original_uri).await?;
+
+    let module_futures = module_names
+        .into_iter()
+        .map(async |module_name| {
+            let prs = get_prs(
+                &octocrab,
+                &server_state.config.github_org,
+                &module_name,
+                false,
+            )
+            .await?;
+            let metrics_futures: Vec<_> = prs
+                .into_iter()
+                .map(async |pr| {
+                    crate::prs::get_review_metrics(&octocrab, &server_state.config.github_org, pr)
+                        .await
+                })
+                .collect();
+            let metrics = join_all(metrics_futures).await;
+            let metrics = metrics.into_iter().collect::<Result<Vec<_>, _>>()?;
+            let aggregate_metrics = AggregatePrMetrics::new(&metrics);
+
+            Ok::<_, Error>(ModuleReviewMetrics {
+                name: module_name,
+                metrics,
+                aggregate_metrics,
+            })
+        })
+        .collect::<Vec<_>>();
+    let modules: Vec<_> = join_all(module_futures).await;
+    let modules = modules.into_iter().collect::<Result<Vec<_>, _>>()?;
+    let aggregate_metrics = AggregatePrMetrics::new(
+        &modules
+            .iter()
+            .flat_map(|m| m.metrics.iter().cloned())
+            .collect::<Vec<_>>(),
+    );
+    Ok(Html(
+        ReviewMetricsTemplate {
+            course_name,
+            modules,
+            aggregate_metrics,
+        }
+        .render()
+        .unwrap(),
+    ))
+}
+
+#[derive(Template)]
+#[template(path = "review-metrics.html")]
+struct ReviewMetricsTemplate {
+    pub course_name: String,
+    pub modules: Vec<ModuleReviewMetrics>,
+    pub aggregate_metrics: AggregatePrMetrics,
+}
+
+pub struct ModuleReviewMetrics {
+    pub name: String,
+    pub metrics: Vec<PrMetrics>,
+    pub aggregate_metrics: AggregatePrMetrics,
+}
+
+impl ReviewMetricsTemplate {
+    pub fn format_duration(&self, duration: &Option<TimeDelta>) -> String {
+        if let Some(duration) = duration {
+            let secs = duration.to_std().unwrap().as_secs();
+            let secs_without_hours = secs - (secs % (60 * 60));
+            humantime::format_duration(std::time::Duration::from_secs(secs_without_hours))
+                .to_string()
+        } else {
+            "Not yet".to_owned()
+        }
+    }
 }
 
 pub async fn index() -> Html<String> {

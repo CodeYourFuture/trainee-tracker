@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Review Metrics</title>
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&amp;family=Raleway:wght@300;600;800;900&amp;family=Lato:wght@500;800&amp;display=swap" rel="stylesheet" media="all" onload="this.media=&quot;all&quot;">
+        <meta charset="UTF-8">
+        <style type="text/css">
+        body {
+            font-family: Raleway, sans-serif;
+        }
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+        }
+        .reviews-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 40px;
+        }
+        .review-card {
+            border: 1px black solid;
+            padding: 5px;
+        }
+        </style>
+    </head>
+    <body>
+        <h1>{{ course_name }}</h1>
+        <div class="stats-container">
+            <div class="stats-card">
+                <h3>Needs review to first review</h3>
+                <ul>
+                    <li>p50: {{format_duration(aggregate_metrics.p50_needs_review_to_first_review)}}</li>
+                    <li>p90: {{format_duration(aggregate_metrics.p90_needs_review_to_first_review)}}</li>
+                    <li>p100: {{format_duration(aggregate_metrics.p100_needs_review_to_first_review)}}</li>
+                </ul>
+            </div>
+            <div class="stats-card">
+                <h3>Created to complete</h3>
+                <ul>
+                    <li>p50: {{format_duration(aggregate_metrics.p50_created_to_complete)}}</li>
+                    <li>p90: {{format_duration(aggregate_metrics.p90_created_to_complete)}}</li>
+                    <li>p100: {{format_duration(aggregate_metrics.p100_created_to_complete)}}</li>
+                </ul>
+            </div>
+            <div class="stats-card">
+                <h3>Needs review to complete</h3>
+                <ul>
+                    <li>p50: {{format_duration(aggregate_metrics.p50_needs_review_to_complete)}}</li>
+                    <li>p90: {{format_duration(aggregate_metrics.p90_needs_review_to_complete)}}</li>
+                    <li>p100: {{format_duration(aggregate_metrics.p100_needs_review_to_complete)}}</li>
+                </ul>
+            </div>
+        </div>
+
+        {% for module in modules %}
+            <h2>{{module.name}}</h2>
+            <div class="stats-container">
+                <div class="stats-card">
+                    <h3>Needs review to first review</h3>
+                    <ul>
+                        <li>p50: {{format_duration(module.aggregate_metrics.p50_needs_review_to_first_review)}}</li>
+                        <li>p90: {{format_duration(module.aggregate_metrics.p90_needs_review_to_first_review)}}</li>
+                        <li>p100: {{format_duration(module.aggregate_metrics.p100_needs_review_to_first_review)}}</li>
+                    </ul>
+                </div>
+                <div class="stats-card">
+                    <h3>Created to complete</h3>
+                    <ul>
+                        <li>p50: {{format_duration(module.aggregate_metrics.p50_created_to_complete)}}</li>
+                        <li>p90: {{format_duration(module.aggregate_metrics.p90_created_to_complete)}}</li>
+                        <li>p100: {{format_duration(module.aggregate_metrics.p100_created_to_complete)}}</li>
+                    </ul>
+                </div>
+                <div class="stats-card">
+                    <h3>Needs review to complete</h3>
+                    <ul>
+                        <li>p50: {{format_duration(module.aggregate_metrics.p50_needs_review_to_complete)}}</li>
+                        <li>p90: {{format_duration(module.aggregate_metrics.p90_needs_review_to_complete)}}</li>
+                        <li>p100: {{format_duration(module.aggregate_metrics.p100_needs_review_to_complete)}}</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="reviews-container">
+                {% for pr in module.metrics %}
+                    <div class="review-card">
+                        <div><a href="{{pr.pr.url}}">{{pr.pr.repo_name}} #{{pr.pr.number}}</a></div>
+                        <div>Created to Complete: {{format_duration(&pr.created_to_complete())}}</div>
+                        <div>Needs Review to Complete: {{format_duration(&pr.needs_review_to_complete())}}</div>
+                        <div>{{pr.iterations}} iterations</div>
+                        <div>Time since created: {{format_duration(&Some(pr.time_since_created()))}}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </body>
+</html>
