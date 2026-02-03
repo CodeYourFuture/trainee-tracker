@@ -146,9 +146,9 @@ const NO_FILES: &str = r#"This PR is missing any submitted files.
 
 Please check that you committed the right files and pushed to the repository"#;
 
-const TOO_MANY_FILES: &str = r#"There are too many files comitted in this pull request.
+const TOO_MANY_FILES: &str = r#"There are too many files committed in this pull request.
 
-Please check and make sure you have not accidentally comitted a cache, virtual environment, or npm package directory."#;
+Please check and make sure you have not accidentally committed a cache, virtual environment, or npm package directory."#;
 
 #[derive(strum_macros::Display)]
 enum ValidationResult {
