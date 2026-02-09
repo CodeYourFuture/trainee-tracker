@@ -27,6 +27,7 @@ use octocrab::{
 };
 use regex::Regex;
 use serde::Serialize;
+use tracing::debug;
 use url::Url;
 
 impl CourseScheduleWithRegisterSheetId {
@@ -945,11 +946,12 @@ fn match_pr_to_assignment(
                 continue;
             }
         }
-        let mut pr_title_words = title_word_set(&pr.title);
+        let mut pr_title_words = title_word_set(pr.title.split("|").last().unwrap_or_default());
         if let Some(claimed_sprint_index) = claimed_sprint_index {
             let claimed_sprint_number = claimed_sprint_index + 1;
             pr_title_words.insert(format!("sprint{}", claimed_sprint_number));
         }
+        debug!(pr=pr.title, title_words=?pr_title_words, "Considering PR");
 
         for (assignment_index, assignment) in sprint.assignments.iter().enumerate() {
             match assignment {
@@ -969,6 +971,10 @@ fn match_pr_to_assignment(
                         }
                     }
                     let match_count = assignment_title_words.intersection(&pr_title_words).count();
+                    debug!(
+                        ?assignment_title_words,
+                        match_count, "Comparing to assignment"
+                    );
                     if !submissions[sprint_index].submissions[assignment_index].is_submitted()
                         && match_count
                             > best_match
@@ -976,6 +982,7 @@ fn match_pr_to_assignment(
                                 .map(|best_match| best_match.match_count)
                                 .unwrap_or_default()
                     {
+                        debug!(match_count, "Best match!");
                         best_match = Some(Match {
                             match_count,
                             sprint_index,
@@ -1047,10 +1054,10 @@ fn title_word_set(title: &str) -> IndexSet<String> {
     title
         .to_lowercase()
         .split(" ")
+        .filter(|s| !s.is_empty())
         .flat_map(|word| word.split("_"))
         .flat_map(|word| word.split("-"))
         .flat_map(|word| word.split("/"))
-        .flat_map(|word| word.split("|"))
         .map(|s| s.to_owned())
         .collect()
 }
