@@ -8,6 +8,7 @@ use trainee_tracker::{
     newtypes::Region,
     octocrab::octocrab_for_token,
     prs::get_prs,
+    setup_logging,
 };
 
 #[tokio::main]
@@ -18,6 +19,8 @@ async fn main() {
         eprintln!("Expected two args - github token and PR link");
         exit(1);
     };
+
+    setup_logging();
 
     let octocrab = octocrab_for_token(github_token.to_owned()).expect("Failed to get octocrab");
 

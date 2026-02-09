@@ -7,6 +7,9 @@ use axum::response::{Html, IntoResponse, Response};
 use moka::future::Cache;
 use slack_with_types::client::RateLimiter;
 use tracing::error;
+use tracing_subscriber::Layer;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use uuid::Uuid;
 
 pub mod auth;
@@ -144,4 +147,16 @@ impl From<anyhow::Error> for Error {
     fn from(error: anyhow::Error) -> Self {
         Error::Fatal(error)
     }
+}
+
+pub fn setup_logging() {
+    let stderr_log_level = tracing_subscriber::filter::LevelFilter::INFO;
+    let stderr_layer = tracing_subscriber::fmt::layer()
+        .pretty()
+        .with_writer(std::io::stderr);
+
+    tracing_subscriber::registry()
+        .with(stderr_layer.with_filter(stderr_log_level))
+        .try_init()
+        .expect("Failed to configure logging");
 }
