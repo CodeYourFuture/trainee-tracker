@@ -2,8 +2,7 @@ use axum::routing::{get, post};
 use dotenv::dotenv;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use tracing::info;
-use tracing_subscriber::prelude::*;
-use trainee_tracker::{Config, ServerState};
+use trainee_tracker::{Config, ServerState, setup_logging};
 
 use std::net::SocketAddr;
 
@@ -17,15 +16,7 @@ async fn main() {
         );
     }
 
-    let stderr_log_level = tracing_subscriber::filter::LevelFilter::INFO;
-    let stderr_layer = tracing_subscriber::fmt::layer()
-        .pretty()
-        .with_writer(std::io::stderr);
-
-    tracing_subscriber::registry()
-        .with(stderr_layer.with_filter(stderr_log_level))
-        .try_init()
-        .expect("Failed to configure logging");
+    setup_logging();
 
     if let Err(err) = dotenv() {
         if !err.not_found() {
