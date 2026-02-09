@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 use indexmap::IndexMap;
 use trainee_tracker::{
     config::{CourseSchedule, CourseScheduleWithRegisterSheetId},
-    course::match_prs_to_assignments,
+    course::{Assignment, Submission, SubmissionState, match_prs_to_assignments},
     newtypes::Region,
     octocrab::octocrab_for_token,
     prs::get_prs,
@@ -61,7 +61,7 @@ async fn main() {
                 .map(|region| (Region(region.to_string()), fixed_date))
                 .collect()
         })
-        .take(3)
+        .take(5)
         .collect(),
     );
     let course_schedule = CourseSchedule {
@@ -109,10 +109,23 @@ async fn main() {
             .iter()
             .zip(sprint_with_submissions.submissions.iter())
         {
-            println!("{:?} - {:?}", assignment, submission);
+            if let Assignment::ExpectedPullRequest { title, .. } = assignment {
+                let text = match submission {
+                    SubmissionState::Some(Submission::PullRequest { pull_request, .. }) => {
+                        format!("{} ({})", pull_request.title, pull_request.url)
+                    }
+                    SubmissionState::MissingButExpected(..) => "MissingButExpected".to_owned(),
+                    SubmissionState::MissingButNotExpected(..) => {
+                        "MissingButNotExpected".to_owned()
+                    }
+                    SubmissionState::MissingStretch(..) => "MissingStretch".to_owned(),
+                    SubmissionState::Some(..) => "Wrong submission type".to_owned(),
+                };
+                println!("{} - {}", title, text);
+            }
         }
     }
     for unknown in matched.unknown_prs {
-        println!("Unknown PR: {:?}", unknown);
+        println!("Unknown PR: {:#?}", unknown);
     }
 }
