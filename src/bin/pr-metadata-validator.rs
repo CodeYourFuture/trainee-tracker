@@ -146,7 +146,7 @@ Make sure to fill in all fields in the template.
 
 Please ensure:
 - [ ] All self checklist items are ticked (with a `[x]`)
-- [ ] The "Changelist" section is either filled with details of what your PR does (or removed, if you think it's too obvious to explain).
+- [ ] The "Changelist" section is filled with details of what your PR does.
 - [ ] The "Questions" section is either filled in (if you have questions) or is removed (if you don't)."#;
 
 const BAD_TITLE_COMMENT_PREFIX: &str = r#"Your PR's title isn't in the expected format.
