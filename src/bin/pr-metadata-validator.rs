@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, process::exit};
 
 use chrono::NaiveDate;
+use clap::Parser;
 use indexmap::IndexMap;
 use maplit::btreemap;
 use octocrab::Octocrab;
@@ -17,13 +18,18 @@ use trainee_tracker::{
 
 const ARBITRARY_REGION: Region = Region(String::new());
 
+#[derive(Parser)]
+struct Args {
+    pr_url: String,
+
+    #[arg(long)]
+    give_more_specific_comment_for_earlier_learners: bool,
+}
+
 #[tokio::main]
 async fn main() {
-    let Ok([_argv0, pr_url]) = <[_; _]>::try_from(std::env::args().collect::<Vec<_>>()) else {
-        eprintln!("Expected one arg - PR URL");
-        exit(1);
-    };
-    let pr = PullRequest::from_html_url(&pr_url).expect("Failed to parse PR URL");
+    let args = Args::parse();
+    let pr = PullRequest::from_html_url(&args.pr_url).expect("Failed to parse PR URL");
 
     // TODO: Fetch this from classplanner or somewhere when we have access to a useful API.
     let known_region_aliases = KnownRegions(btreemap! {
@@ -69,7 +75,13 @@ async fn main() {
             exit(0);
         }
         ValidationResult::CouldNotMatch => COULD_NOT_MATCH_COMMENT,
-        ValidationResult::BodyTemplateNotFilledOut => BODY_TEMPLATE_NOT_FILLED_IN_COMMENT,
+        ValidationResult::BodyTemplateNotFilledOut => {
+            if args.give_more_specific_comment_for_earlier_learners {
+                BODY_TEMPLATE_NOT_FILLED_IN_SPECIFIC_COMMENT
+            } else {
+                BODY_TEMPLATE_NOT_FILLED_IN_VAGUE_COMMENT
+            }
+        }
         ValidationResult::BadTitleFormat { reason } => {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
@@ -122,9 +134,20 @@ const COULD_NOT_MATCH_COMMENT: &str = r#"Your PR couldn't be matched to an assig
 
 Please check its title is in the correct format, and that you only have one PR per assignment."#;
 
-const BODY_TEMPLATE_NOT_FILLED_IN_COMMENT: &str = r#"Your PR description contained template fields which weren't filled in.
+const BODY_TEMPLATE_NOT_FILLED_IN_VAGUE_COMMENT: &str = r#"Your PR description contained template fields which weren't filled in.
 
 Check you've ticked everything in the self checklist, and that any sections which prompt you to fill in an answer are either filled in or removed."#;
+
+const BODY_TEMPLATE_NOT_FILLED_IN_SPECIFIC_COMMENT: &str = r#"Your PR description is incomplete.
+
+You filled out a template (that starts "Learners, PR Template") when you created this PR - you can see it at the top of this page.
+
+Make sure to fill in all fields in the template.
+
+Please ensure:
+- [ ] All self checklist items are ticked (with a `[x]`)
+- [ ] The "Changelist" section is filled with details of what your PR does.
+- [ ] The "Questions" section is either filled in (if you have questions) or is removed (if you don't)."#;
 
 const BAD_TITLE_COMMENT_PREFIX: &str = r#"Your PR's title isn't in the expected format.
 
