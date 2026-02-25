@@ -62,7 +62,7 @@ fn trainees_from_sheet(sheet: &Sheet) -> Result<BTreeMap<GithubLogin, Trainee>, 
             )));
         }
 
-        let github_login = GithubLogin::from(cell_string(&cells[3]));
+        let github_login = GithubLogin::from(cell_string(&cells[3]).trim().to_owned());
 
         let email = cell_string(&cells[4]);
 
