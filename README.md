@@ -29,3 +29,7 @@ Set up an OAuth application in a project in https://console.cloud.google.com/aut
 ### Slack (optional)
 
 If you want Slack integration (you probably don't), make a Slack App and set `CYF_TRAINEE_TRACKER_SLACK_CLIENT_SECRET=`.
+
+### PR validator bot (optional)
+To allow the PR validator to test things without setting up a github app for the whole tracker, create a token with with pull request permissions and set the following env var:
+* `GH_TOKEN=`
