@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, ops::AddAssign};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::AddAssign,
+};
 
 use ::octocrab::models::{Author, teams::RequestedTeam};
 use anyhow::Context;
@@ -18,7 +21,7 @@ use crate::{
     Error, ServerState,
     github_accounts::get_trainees,
     newtypes::GithubLogin,
-    octocrab::{all_pages, octocrab},
+    octocrab::{all_pages, octocrab, octocrab_for_maybe_token},
     prs::{PrWithReviews, fill_in_reviewers, get_prs},
     register::{Attendance, get_register},
     sheets::sheets_client,
@@ -330,4 +333,31 @@ pub async fn expected_attendance(
         }
     }
     Json(expected_attendance)
+}
+
+pub async fn started_itp(
+    session: Session,
+    State(server_state): State<ServerState>,
+    OriginalUri(original_uri): OriginalUri,
+) -> Result<Json<BTreeSet<GithubLogin>>, Error> {
+    let octocrab = octocrab(&session, &server_state, original_uri).await;
+    // Allow un-authenticated requests to this endpoint.
+    let octocrab = if let Ok(octocrab) = octocrab {
+        octocrab
+    } else {
+        octocrab_for_maybe_token(None)?
+    };
+    let prs = all_pages("pull requests", &octocrab, async || {
+        octocrab
+            .pulls(server_state.config.github_org, "Module-Onboarding")
+            .list()
+            .send()
+            .await
+    })
+    .await?;
+    let usernames: BTreeSet<_> = prs
+        .into_iter()
+        .filter_map(|pr| Some(GithubLogin::from(pr.user?.login)))
+        .collect();
+    Ok(Json(usernames))
 }

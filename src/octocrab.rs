@@ -39,6 +39,19 @@ pub(crate) async fn octocrab(
 }
 
 pub fn octocrab_for_token(token: String) -> Result<Octocrab, Error> {
+    octocrab_for_maybe_token(Some(token))
+}
+
+pub fn octocrab_for_maybe_token(token: Option<String>) -> Result<Octocrab, Error> {
+    let header_value = if let Some(token) = token {
+        Some(
+            HeaderValue::from_str(&format!("Bearer {token}"))
+                .context("Token couldn't used as a header")?,
+        )
+    } else {
+        None
+    };
+
     let connector = HttpsConnectorBuilder::new()
         .with_webpki_roots()
         .https_only()
@@ -67,10 +80,7 @@ pub fn octocrab_for_token(token: String) -> Result<Octocrab, Error> {
             HeaderValue::from_static("octocrab"),
         )])))
         .with_layer(&AuthHeaderLayer::new(
-            Some(
-                HeaderValue::from_str(&format!("Bearer {token}"))
-                    .context("Token couldn't used as a header")?,
-            ),
+            header_value,
             Uri::from_static(GITHUB_BASE_URI),
             Uri::from_static(GITHUB_BASE_UPLOAD_URI),
         ))

@@ -111,6 +111,10 @@ async fn main() {
             get(trainee_tracker::endpoints::expected_attendance),
         )
         .route(
+            "/api/started-itp",
+            get(trainee_tracker::endpoints::started_itp),
+        )
+        .route(
             "/codility/verify-webhook",
             post(trainee_tracker::codility::verify_webhook),
         )
