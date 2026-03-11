@@ -149,6 +149,9 @@ fn parse_issue(issue: &Issue) -> Result<Option<(NonZeroUsize, Assignment)>, Erro
     let mut optionality = None;
 
     for label in labels {
+        if label.name == "NotCoursework" {
+            return Ok(None);
+        }
         if let Some(sprint_number) = label.name.strip_prefix("📅 Sprint ") {
             match NonZeroUsize::from_str(sprint_number) {
                 Ok(sprint_number) => {
