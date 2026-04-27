@@ -24,6 +24,9 @@ struct Args {
 
     #[arg(long)]
     give_more_specific_comment_for_earlier_learners: bool,
+
+    #[arg(long)]
+    only_close_existing_comments_with_tag: Option<String>,
 }
 
 #[tokio::main]
@@ -44,6 +47,13 @@ async fn main() {
     let github_token =
         std::env::var("GH_TOKEN").expect("GH_TOKEN wasn't set - must be set to a GitHub API token");
     let octocrab = octocrab_for_token(github_token).expect("Failed to get octocrab");
+
+    if let Some(tag) = args.only_close_existing_comments_with_tag {
+        close_existing_comments(&octocrab, &pr, &tag)
+            .await
+            .expect("Failed to close existing comments");
+        exit(0);
+    }
 
     let course_schedule = make_fake_course_schedule(pr.repo.clone());
 
