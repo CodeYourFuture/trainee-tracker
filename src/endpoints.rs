@@ -3,7 +3,7 @@ use std::{
     ops::AddAssign,
 };
 
-use ::octocrab::models::{Author, teams::RequestedTeam};
+use ::octocrab::models::teams::RequestedTeam;
 use anyhow::Context;
 use axum::{
     Json,
@@ -19,6 +19,7 @@ use tower_sessions::Session;
 
 use crate::{
     Error, ServerState,
+    course::{BatchMembers, get_batch_members},
     github_accounts::get_trainees,
     newtypes::GithubLogin,
     octocrab::{all_pages, octocrab, octocrab_for_maybe_token},
@@ -104,30 +105,27 @@ pub async fn trainee_batches(
     }))
 }
 
-#[derive(Serialize)]
-pub struct Batch {
-    trainees: Vec<String>,
-}
-
 pub async fn trainee_batch(
     session: Session,
+    headers: HeaderMap,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
     Path((_course, batch)): Path<(String, String)>,
-) -> Result<Json<Batch>, Error> {
-    let octocrab = octocrab(&session, &server_state, original_uri).await?;
-    let trainees = all_pages("team members", &octocrab, async || {
-        octocrab
-            .teams(server_state.config.github_org)
-            .members(batch)
-            .send()
-            .await
-    })
-    .await?
-    .into_iter()
-    .map(|Author { login, .. }| login)
-    .collect();
-    Ok(Json(Batch { trainees }))
+) -> Result<Json<BatchMembers>, Error> {
+    let octocrab = octocrab(&session, &server_state, original_uri.clone()).await?;
+    let sheets_client =
+        sheets_client(&session, server_state.clone(), headers, original_uri).await?;
+
+    let batch_members = get_batch_members(
+        &octocrab,
+        sheets_client,
+        &server_state.config.github_email_mapping_sheet_id,
+        &server_state.config.github_org,
+        &batch,
+    )
+    .await?;
+
+    Ok(Json(batch_members))
 }
 
 pub async fn teams(

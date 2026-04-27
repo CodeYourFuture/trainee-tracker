@@ -347,6 +347,7 @@ pub enum AssignmentOptionality {
     Stretch,
 }
 
+#[derive(Serialize)]
 pub struct BatchMembers {
     pub name: String,
     pub trainees: BTreeMap<GithubLogin, Trainee>,
