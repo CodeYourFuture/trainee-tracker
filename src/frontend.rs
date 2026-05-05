@@ -339,10 +339,14 @@ pub struct ModuleReviewMetrics {
 impl ReviewMetricsTemplate {
     pub fn format_duration(&self, duration: &Option<TimeDelta>) -> String {
         if let Some(duration) = duration {
-            let secs = duration.to_std().unwrap().as_secs();
-            let secs_without_hours = secs - (secs % (60 * 60));
-            humantime::format_duration(std::time::Duration::from_secs(secs_without_hours))
-                .to_string()
+            if let Ok(duration) = duration.to_std() {
+                let secs = duration.as_secs();
+                let secs_without_hours = secs - (secs % (60 * 60));
+                humantime::format_duration(std::time::Duration::from_secs(secs_without_hours))
+                    .to_string()
+            } else {
+                format!("Invalid duration: {:?}", duration)
+            }
         } else {
             "Not yet".to_owned()
         }
