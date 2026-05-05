@@ -100,17 +100,13 @@ pub async fn get_prs(
                  ..
              }| {
                 // If a user is deleted from GitHub, their User will be None - ignore PRs from deleted users.
-                let author = GithubLogin::from(user?.login);
+                let author = GithubLogin::from(user.login);
 
-                let labels = labels
-                    .into_iter()
-                    .flatten()
-                    .map(|label| label.name)
-                    .collect();
+                let labels = labels.into_iter().map(|label| label.name).collect();
 
                 let pr_state = PrState::from(&labels);
 
-                let is_closed = state.unwrap_or(IssueState::Open) == IssueState::Closed;
+                let is_closed = state == IssueState::Closed;
                 if is_closed && pr_state != PrState::Complete {
                     return None;
                 }
@@ -118,11 +114,7 @@ pub async fn get_prs(
                 // For some reason repo is generally None, but we know it, so...
                 let repo_name = module.to_owned();
 
-                // Unclear when they API would return None for these, ignore them.
-                let updated_at = updated_at?;
-                let created_at = created_at?;
-                let url = html_url?.to_string();
-                let title = title?;
+                let url = html_url.to_string();
                 let body = body.unwrap_or_default();
 
                 Some(Pr {
