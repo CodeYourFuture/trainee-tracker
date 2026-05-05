@@ -365,6 +365,126 @@
               }
             ]
           }
+        },
+        "2026-may-itp": {
+          "start": "2026-05-01",
+          "end": "2026-08-31",
+          "sprints": {
+            "Module-Welcome": [
+              {
+                "Glasgow": "2026-05-09",
+                "London": "2026-05-09",
+                "North West": "2026-05-09",
+                "Sheffield": "2026-05-09",
+                "South Africa": "2026-05-09",
+                "West Midlands": "2026-05-09"
+              }
+            ],
+            "Module-Onboarding": [
+              {
+                "Glasgow": "2026-05-16",
+                "London": "2026-05-16",
+                "North West": "2026-05-16",
+                "Sheffield": "2026-05-16",
+                "South Africa": "2026-05-16",
+                "West Midlands": "2026-05-16"
+              },
+              {
+                "Glasgow": "2026-05-30",
+                "London": "2026-05-30",
+                "North West": "2026-05-30",
+                "Sheffield": "2026-05-30",
+                "South Africa": "2026-05-30",
+                "West Midlands": "2026-05-30"
+              },
+              {
+                "Glasgow": "2026-06-06",
+                "London": "2026-06-06",
+                "North West": "2026-06-06",
+                "Sheffield": "2026-06-06",
+                "South Africa": "2026-06-06",
+                "West Midlands": "2026-06-06"
+              }
+            ],
+            "Module-Structuring-And-Testing-Data": [
+              {
+                "Glasgow": "2026-06-13",
+                "London": "2026-06-13",
+                "North West": "2026-06-13",
+                "Sheffield": "2026-06-13",
+                "South Africa": "2026-06-13",
+                "West Midlands": "2026-06-13"
+              },
+              {
+                "Glasgow": "2026-06-27",
+                "London": "2026-06-27",
+                "North West": "2026-06-27",
+                "Sheffield": "2026-06-27",
+                "South Africa": "2026-06-27",
+                "West Midlands": "2026-06-27"
+              },
+              {
+                "Glasgow": "2026-07-04",
+                "London": "2026-07-04",
+                "North West": "2026-07-04",
+                "Sheffield": "2026-07-04",
+                "South Africa": "2026-07-04",
+                "West Midlands": "2026-07-04"
+              }
+            ],
+            "Module-Data-Groups": [
+              {
+                "Glasgow": "2026-07-11",
+                "London": "2026-07-11",
+                "North West": "2026-07-11",
+                "Sheffield": "2026-07-11",
+                "South Africa": "2026-07-11",
+                "West Midlands": "2026-07-11"
+              },
+              {
+                "Glasgow": "2026-07-18",
+                "London": "2026-07-18",
+                "North West": "2026-07-18",
+                "Sheffield": "2026-07-18",
+                "South Africa": "2026-07-18",
+                "West Midlands": "2026-07-18"
+              },
+              {
+                "Glasgow": "2026-07-25",
+                "London": "2026-07-25",
+                "North West": "2026-07-25",
+                "Sheffield": "2026-07-25",
+                "South Africa": "2026-07-25",
+                "West Midlands": "2026-07-25"
+              }
+            ],
+            "Module-Data-Flows": [
+              {
+                "Glasgow": "2026-08-01",
+                "London": "2026-08-01",
+                "North West": "2026-08-01",
+                "Sheffield": "2026-08-01",
+                "South Africa": "2026-08-01",
+                "West Midlands": "2026-08-01"
+              },
+              {
+                "Glasgow": "2026-08-08",
+                "London": "2026-08-08",
+                "North West": "2026-08-08",
+                "Sheffield": "2026-08-08",
+                "South Africa": "2026-08-08",
+                "West Midlands": "2026-08-08"
+              },
+              {
+                "Glasgow": "2026-08-15",
+                "London": "2026-08-15",
+                "North West": "2026-08-15",
+                "Sheffield": "2026-08-15",
+                "South Africa": "2026-08-15",
+                "West Midlands": "2026-08-15"
+              }
+            ]
+          }
         }
       }
     },
