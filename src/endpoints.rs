@@ -355,7 +355,7 @@ pub async fn started_itp(
     .await?;
     let usernames: BTreeSet<_> = prs
         .into_iter()
-        .filter_map(|pr| Some(GithubLogin::from(pr.user?.login)))
+        .filter_map(|pr| Some(GithubLogin::from(pr.user.login)))
         .collect();
     Ok(Json(usernames))
 }

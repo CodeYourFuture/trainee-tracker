@@ -37,8 +37,8 @@ itertools = "0.14.0"
 maplit = "1.0.2"
 md5 = "0.8.0"
 moka = { version = "0.12.10", features = ["future"] }
-# Until https://github.com/XAMPPRocky/octocrab/pull/854 is released.
-octocrab = { git = "https://github.com/XAMPPRocky/octocrab.git", rev = "460733dd3f49863b159ffb48050ab9523300ff84" }
+# Until https://github.com/XAMPPRocky/octocrab/issues/884 is resolved
+octocrab = { git = "https://github.com/XAMPPRocky/octocrab.git", rev = "986289adc94b856c04a912b2c4cae07c63444d6d" }
 octocrab-rate-limiter = "0.1.1"
 regex = "1.11.1"
 reqwest = { version = "0.12.20", default-features = false, features = [
