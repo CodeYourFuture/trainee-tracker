@@ -1,11 +1,19 @@
-use std::{collections::BTreeMap, net::IpAddr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::IpAddr,
+};
 
 use chrono::NaiveDate;
 use indexmap::IndexMap;
+use octocrab::Octocrab;
 use serde::Deserialize;
 use serde_env_field::EnvField;
 
-use crate::newtypes::Region;
+use crate::{
+    Error,
+    newtypes::{GithubLogin, Region},
+    octocrab::all_pages,
+};
 
 #[derive(Clone, Deserialize)]
 pub struct Config {
@@ -39,6 +47,8 @@ pub struct Config {
     pub mentoring_records_sheet_id: String,
 
     pub reviewer_staff_info_sheet_id: String,
+
+    pub staff_github_team_name: EnvField<String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -76,6 +86,24 @@ impl Config {
         } else {
             None
         }
+    }
+
+    pub async fn get_staff_github_usernames(
+        &self,
+        octocrab: &Octocrab,
+    ) -> Result<BTreeSet<GithubLogin>, Error> {
+        let members = all_pages("members", &octocrab, async || {
+            octocrab
+                .teams(&self.github_org)
+                .members(self.staff_github_team_name.as_str())
+                .send()
+                .await
+        })
+        .await?;
+        Ok(members
+            .into_iter()
+            .map(|member| GithubLogin::from(member.login))
+            .collect())
     }
 }
 

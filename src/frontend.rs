@@ -275,6 +275,12 @@ pub async fn get_review_metrics(
 
     let octocrab = octocrab(&session, &server_state, original_uri).await?;
 
+    let staff_usernames = server_state
+        .config
+        .get_staff_github_usernames(&octocrab)
+        .await
+        .map_err(|err| err.context("Unable to get staff usernames"))?;
+
     let module_futures = module_names
         .into_iter()
         .map(async |module_name| {
@@ -288,8 +294,13 @@ pub async fn get_review_metrics(
             let metrics_futures: Vec<_> = prs
                 .into_iter()
                 .map(async |pr| {
-                    crate::prs::get_review_metrics(&octocrab, &server_state.config.github_org, pr)
-                        .await
+                    crate::prs::get_review_metrics(
+                        &octocrab,
+                        &server_state.config.github_org,
+                        pr,
+                        &staff_usernames,
+                    )
+                    .await
                 })
                 .collect();
             let metrics = join_all(metrics_futures).await;

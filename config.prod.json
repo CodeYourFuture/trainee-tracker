@@ -871,5 +871,6 @@
         }
       }
     }
-  }
+  },
+  "staff_github_team_name": "$CYF_STAFF_GITHUB_TEAM_NAME"
 }
