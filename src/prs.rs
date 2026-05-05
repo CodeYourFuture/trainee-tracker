@@ -245,6 +245,8 @@ pub struct AggregatePrMetrics {
     pub p100_needs_review_to_complete: Option<TimeDelta>,
 
     pub iteration_counts: BTreeMap<usize, usize>,
+
+    pub reviewed_by_counts: BTreeMap<ReviewedBy, usize>,
 }
 
 impl AggregatePrMetrics {
@@ -271,10 +273,12 @@ impl AggregatePrMetrics {
         });
 
         let mut iteration_counts = BTreeMap::new();
+        let mut reviewed_by_counts = BTreeMap::new();
         for metric in metrics {
             if metric.first_complete.is_some() {
                 *iteration_counts.entry(metric.iterations).or_default() += 1;
             }
+            *reviewed_by_counts.entry(metric.reviewed_by).or_default() += 1;
         }
 
         AggregatePrMetrics {
@@ -288,6 +292,7 @@ impl AggregatePrMetrics {
             p90_needs_review_to_complete,
             p100_needs_review_to_complete,
             iteration_counts,
+            reviewed_by_counts,
         }
     }
 
@@ -322,6 +327,7 @@ pub struct PrMetrics {
     pub first_reviewed: Option<chrono::DateTime<chrono::Utc>>,
     pub first_complete: Option<chrono::DateTime<chrono::Utc>>,
     pub iterations: usize,
+    pub reviewed_by: ReviewedBy,
 }
 
 impl PrMetrics {
@@ -343,6 +349,7 @@ impl PrMetrics {
                     first_needs_review = Some(event.time);
                 }
             } else if event.actor != pr.author {
+                reviewed_by.observe_also(&event.actor, staff);
                 if event.label == "Reviewed" {
                     iterations += 1;
                     if first_reviewed.is_none() {
@@ -365,6 +372,7 @@ impl PrMetrics {
             first_reviewed,
             first_complete,
             iterations,
+            reviewed_by,
         }
     }
 
@@ -382,6 +390,39 @@ impl PrMetrics {
 
     pub(crate) fn time_since_created(&self) -> TimeDelta {
         chrono::Utc::now() - self.created_at
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, PartialOrd, Ord, strum_macros::Display)]
+pub enum ReviewedBy {
+    NoOne,
+    OnlyStaff,
+    OnlyVolunteer,
+    StaffAndVolunteer,
+}
+
+impl ReviewedBy {
+    fn observe_also(&mut self, user: &GithubLogin, staff: &BTreeSet<GithubLogin>) {
+        match self {
+            ReviewedBy::NoOne => {
+                if staff.contains(user) {
+                    *self = ReviewedBy::OnlyStaff;
+                } else {
+                    *self = ReviewedBy::OnlyVolunteer;
+                }
+            }
+            ReviewedBy::OnlyStaff => {
+                if !staff.contains(user) {
+                    *self = ReviewedBy::StaffAndVolunteer;
+                }
+            }
+            ReviewedBy::OnlyVolunteer => {
+                if staff.contains(user) {
+                    *self = ReviewedBy::StaffAndVolunteer;
+                }
+            }
+            ReviewedBy::StaffAndVolunteer => {}
+        }
     }
 }
 
@@ -521,6 +562,7 @@ pub(crate) async fn get_review_metrics(
     octocrab: &Octocrab,
     github_org: &str,
     pr: Pr,
+    staff: &BTreeSet<GithubLogin>,
 ) -> Result<PrMetrics, Error> {
     let events = all_pages("timeline events", octocrab, async || {
         octocrab
@@ -561,7 +603,7 @@ pub(crate) async fn get_review_metrics(
         )
         .collect();
     let created_at = pr.created_at;
-    Ok(PrMetrics::new(pr, created_at, label_add_events))
+    Ok(PrMetrics::new(pr, created_at, label_add_events, staff))
 }
 
 // Ideally this would be a more general shared function, but async closures aren't super stable yet.
