@@ -329,26 +329,30 @@ impl PrMetrics {
         pr: Pr,
         created_at: chrono::DateTime<chrono::Utc>,
         label_add_events: Vec<LabelAddEvent>,
+        staff: &BTreeSet<GithubLogin>,
     ) -> PrMetrics {
         let mut first_needs_review = None;
         let mut first_reviewed = None;
         let mut first_complete = None;
         let mut iterations = 0;
+        let mut reviewed_by = ReviewedBy::NoOne;
 
         for event in &label_add_events {
             if event.label == "Needs Review" {
                 if first_needs_review.is_none() {
                     first_needs_review = Some(event.time);
                 }
-            } else if event.label == "Reviewed" {
-                iterations += 1;
-                if first_reviewed.is_none() {
-                    first_reviewed = Some(event.time);
-                }
-            } else if event.label == "Complete" {
-                iterations += 1;
-                if first_complete.is_none() {
-                    first_complete = Some(event.time);
+            } else if event.actor != pr.author {
+                if event.label == "Reviewed" {
+                    iterations += 1;
+                    if first_reviewed.is_none() {
+                        first_reviewed = Some(event.time);
+                    }
+                } else if event.label == "Complete" {
+                    iterations += 1;
+                    if first_complete.is_none() {
+                        first_complete = Some(event.time);
+                    }
                 }
             }
         }
