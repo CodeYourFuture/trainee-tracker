@@ -32,6 +32,9 @@
     </head>
     <body>
         <h1>{{ course_name }}</h1>
+        <form method="GET">
+            <label>Only show year<input type="number" name="year" value="{% if let Some(year) = query_params.year %}{{year}}{%endif%}" /></label><label>Include closed PRs <input type="checkbox" name="include_closed" value="true" {% if query_params.include_closed.unwrap_or(false) %}checked{%endif%} /></label><input type="submit" />
+        </form>
         <div class="stats-container">
             <div class="stats-card">
                 <h3>Needs review to first review</h3>

@@ -6,10 +6,11 @@ use axum::{
     extract::{OriginalUri, Path, Query, State},
     response::{Html, IntoResponse, Response},
 };
-use chrono::TimeDelta;
+use axum_extra::extract::OptionalQuery;
+use chrono::{Datelike, TimeDelta};
 use futures::future::join_all;
 use http::{HeaderMap, StatusCode, Uri, header::CONTENT_TYPE};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tower_sessions::Session;
 
 use crate::{
@@ -262,11 +263,19 @@ struct ReviewersTemplate {
     pub now: chrono::DateTime<chrono::Utc>,
 }
 
+#[derive(Copy, Clone, Default, Deserialize, Serialize)]
+pub struct ReviewMetricsParams {
+    #[serde(deserialize_with = "serde_with::rust::string_empty_as_none::deserialize")]
+    year: Option<i32>,
+    include_closed: Option<bool>,
+}
+
 pub async fn get_review_metrics(
     session: Session,
     State(server_state): State<ServerState>,
     OriginalUri(original_uri): OriginalUri,
     Path(course_name): Path<String>,
+    OptionalQuery(query_params): OptionalQuery<ReviewMetricsParams>,
 ) -> Result<Html<String>, Error> {
     let module_names = server_state
         .config
@@ -281,6 +290,8 @@ pub async fn get_review_metrics(
         .await
         .map_err(|err| err.context("Unable to get staff usernames"))?;
 
+    let query_params = query_params.unwrap_or_default();
+
     let module_futures = module_names
         .into_iter()
         .map(async |module_name| {
@@ -288,9 +299,18 @@ pub async fn get_review_metrics(
                 &octocrab,
                 &server_state.config.github_org,
                 &module_name,
-                false,
+                query_params.include_closed.unwrap_or(false),
             )
-            .await?;
+            .await?
+            .into_iter()
+            .filter(|pr| {
+                if let Some(year) = query_params.year {
+                    pr.created_at.year() == year
+                } else {
+                    true
+                }
+            })
+            .collect::<Vec<_>>();
             let metrics_futures: Vec<_> = prs
                 .into_iter()
                 .map(async |pr| {
@@ -327,6 +347,7 @@ pub async fn get_review_metrics(
             course_name,
             modules,
             aggregate_metrics,
+            query_params,
         }
         .render()
         .unwrap(),
@@ -339,6 +360,7 @@ struct ReviewMetricsTemplate {
     pub course_name: String,
     pub modules: Vec<ModuleReviewMetrics>,
     pub aggregate_metrics: AggregatePrMetrics,
+    pub query_params: ReviewMetricsParams,
 }
 
 pub struct ModuleReviewMetrics {
