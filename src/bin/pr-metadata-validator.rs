@@ -97,8 +97,8 @@ async fn main() {
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
         ValidationResult::WrongFiles {
-            expected_files_pattern,
-        } => &format!("{}`{}`", WRONG_FILES, expected_files_pattern),
+            example_wrong_file,
+        } => &format!("{}`{}`", WRONG_FILES, example_wrong_file),
         ValidationResult::NoFiles => NO_FILES,
         ValidationResult::TooManyFiles => TOO_MANY_FILES,
     };
@@ -169,11 +169,13 @@ const UNKNOWN_REGION_COMMENT: &str = r#"Your PR's title didn't contain a known r
 
 Please check the expected title format, and make sure your region is in the correct place and spelled correctly."#;
 
-const WRONG_FILES: &str = r#"The changed files in this PR don't match what is expected for this task.
+const WRONG_FILES: &str = r#"The files changed in this PR don't match what is expected for this task.
 
 Please check that you committed the right files for the task, and that there are no accidentally committed files from other sprints.
 
-Please review the changed files tab at the top of the page, we are only expecting changes in this directory: "#;
+Please review the 'files changed' tab at the top of the page.
+
+Here is an example of a file that has been incorrectly comitted: "#;
 
 const NO_FILES: &str = r#"This PR is missing any submitted files.
 
@@ -190,7 +192,7 @@ enum ValidationResult {
     CouldNotMatch,
     BadTitleFormat { reason: String },
     UnknownRegion,
-    WrongFiles { expected_files_pattern: String },
+    WrongFiles { example_wrong_file: String },
     NoFiles,
     TooManyFiles,
 }
@@ -357,7 +359,7 @@ async fn check_pr_file_changes(
         }
         if !directory_matcher.is_match(&pr_file.filename) {
             return Ok(ValidationResult::WrongFiles {
-                expected_files_pattern: directory_description_regex.to_string(),
+                example_wrong_file: pr_file.filename,
             });
         }
     }
