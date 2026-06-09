@@ -96,9 +96,9 @@ async fn main() {
             &format!("{}{}", BAD_TITLE_COMMENT_PREFIX, reason)
         }
         ValidationResult::UnknownRegion => UNKNOWN_REGION_COMMENT,
-        ValidationResult::WrongFiles {
-            example_wrong_file,
-        } => &format!("{}`{}`", WRONG_FILES, example_wrong_file),
+        ValidationResult::WrongFiles { example_wrong_file } => {
+            &format!("{}`{}`", WRONG_FILES, example_wrong_file)
+        }
         ValidationResult::NoFiles => NO_FILES,
         ValidationResult::TooManyFiles => TOO_MANY_FILES,
     };
