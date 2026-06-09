@@ -175,7 +175,7 @@ Please check that you committed the right files for the task, and that there are
 
 Please review the 'files changed' tab at the top of the page.
 
-Here is an example of a file that has been incorrectly comitted: "#;
+Here is an example of a file that has been changed on this branch but shouldn't be: "#;
 
 const NO_FILES: &str = r#"This PR is missing any submitted files.
 
