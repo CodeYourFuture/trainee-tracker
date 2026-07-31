@@ -281,6 +281,9 @@ async fn validate_pr(
             .body
             .contains("Ask any questions you have for your reviewer.")
         || pr_in_question.body.contains("- [ ]")
+        || pr_in_question
+            .body
+            .contains("Replace this line with the Task code (e.g. CYF-0000).")
     {
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
