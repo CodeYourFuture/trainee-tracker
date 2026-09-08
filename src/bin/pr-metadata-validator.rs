@@ -1,22 +1,16 @@
 use std::{collections::BTreeMap, process::exit};
 
-use chrono::NaiveDate;
 use clap::Parser;
-use indexmap::IndexMap;
 use maplit::btreemap;
 use octocrab::Octocrab;
 use regex::Regex;
 use trainee_tracker::{
-    Error,
-    config::{CourseSchedule, CourseScheduleWithRegisterSheetId},
-    course::{get_descriptor_id_for_pr, match_prs_to_assignments},
-    newtypes::Region,
+    Error, coursework_index,
+    newtypes::TaskId,
     octocrab::{all_pages, octocrab_for_token},
     pr_comments::{PullRequest, close_existing_comments, leave_tagged_comment},
     prs::get_prs,
 };
-
-const ARBITRARY_REGION: Region = Region(String::new());
 
 #[derive(Parser)]
 struct Args {
@@ -55,16 +49,8 @@ async fn main() {
         exit(0);
     }
 
-    let course_schedule = make_fake_course_schedule(pr.repo.clone());
-
-    let course = CourseScheduleWithRegisterSheetId {
-        name: "itp".to_owned(),
-        register_sheet_id: "".to_owned(),
-        course_schedule,
-    };
     let result = validate_pr(
         &octocrab,
-        course,
         &pr.repo,
         &pr.org,
         pr.number,
@@ -84,6 +70,7 @@ async fn main() {
             }
             exit(0);
         }
+        ValidationResult::NoTaskId => NO_TASK_ID_COMMENT,
         ValidationResult::CouldNotMatch => COULD_NOT_MATCH_COMMENT,
         ValidationResult::BodyTemplateNotFilledOut => {
             if args.give_more_specific_comment_for_earlier_learners {
@@ -140,9 +127,13 @@ async fn main() {
     exit(2);
 }
 
-const COULD_NOT_MATCH_COMMENT: &str = r#"Your PR couldn't be matched to an assignment in this module.
+const NO_TASK_ID_COMMENT: &str = r#"Your PR didn't include a Task ID in its description.
 
-Please check its title is in the correct format, and that you only have one PR per assignment."#;
+Make sure you have put the correct Task ID in its description."#;
+
+const COULD_NOT_MATCH_COMMENT: &str = r#"Your PR included an an unrecognised Task ID.
+
+Make sure you have put the correct Task ID in its description."#;
 
 const BODY_TEMPLATE_NOT_FILLED_IN_VAGUE_COMMENT: &str = r#"Your PR description contained template fields which weren't filled in.
 
@@ -195,21 +186,16 @@ enum ValidationResult {
     WrongFiles { example_wrong_file: String },
     NoFiles,
     TooManyFiles,
+    NoTaskId,
 }
 
 async fn validate_pr(
     octocrab: &Octocrab,
-    course_schedule: CourseScheduleWithRegisterSheetId,
     module_name: &str,
     github_org_name: &str,
     pr_number: u64,
     known_region_aliases: &KnownRegions,
 ) -> Result<ValidationResult, Error> {
-    let course = course_schedule
-        .with_assignments(octocrab, github_org_name)
-        .await
-        .map_err(|err| err.context("Failed to get assignments"))?;
-
     let module_prs = get_prs(octocrab, github_org_name, module_name, false)
         .await
         .map_err(|err| err.context("Failed to get PRs"))?;
@@ -229,26 +215,8 @@ async fn validate_pr(
         return Ok(ValidationResult::Ok);
     }
 
-    let user_prs: Vec<_> = module_prs
-        .into_iter()
-        .filter(|pr| pr.author == pr_in_question.author)
-        .collect();
-    let matched = match_prs_to_assignments(
-        &course.modules[module_name],
-        user_prs,
-        Vec::new(),
-        &ARBITRARY_REGION,
-    )
-    .map_err(|err| err.context("Failed to match PRs to assignments"))?;
-
-    for pr in matched.unknown_prs {
-        if pr.number == pr_number {
-            return Ok(ValidationResult::CouldNotMatch);
-        }
-    }
-
     let title_sections: Vec<&str> = pr_in_question.title.split("|").collect();
-    if title_sections.len() != 5 {
+    if title_sections.len() < 4 || title_sections.len() > 5 {
         return Ok(ValidationResult::BadTitleFormat {
             reason: "Wrong number of parts separated by |s".to_owned(),
         });
@@ -283,24 +251,35 @@ async fn validate_pr(
         || pr_in_question.body.contains("- [ ]")
         || pr_in_question
             .body
-            .contains("Replace this line with the Task code (e.g. CYF-0000).")
+            .contains("Replace this line with the Task code")
+        || pr_in_question.body.contains("CYF-0000")
     {
         return Ok(ValidationResult::BodyTemplateNotFilledOut);
     }
 
-    let pr_assignment_descriptor_id =
-        get_descriptor_id_for_pr(&matched.sprints, pr_number).expect("This PR does not exist");
-    // This should never error, as a PR by this point in code must have been matched
-    // with an assignment, and PR assignments must have an associated issue descriptor
+    let Some(pr_task_id) = get_task_id_for_pr(&pr_in_question.body) else {
+        return Ok(ValidationResult::NoTaskId);
+    };
 
     check_pr_file_changes(
         octocrab,
         github_org_name,
         module_name,
         pr_number,
-        pr_assignment_descriptor_id,
+        &pr_task_id,
     )
     .await
+}
+
+fn get_task_id_for_pr(description: &str) -> Option<TaskId> {
+    let regex = Regex::new("(CYF-\\d{4,})").expect("Failed to parse known-good regex");
+    let task_id = regex
+        .captures(description)?
+        .get(0)
+        .expect("Failed to get capture")
+        .as_str()
+        .to_owned();
+    Some(TaskId(task_id))
 }
 
 // Check the changed files in a pull request match what is expected for that sprint task
@@ -309,33 +288,22 @@ async fn check_pr_file_changes(
     org_name: &str,
     module_name: &str,
     pr_number: u64,
-    task_issue_number: u64,
+    task_id: &TaskId,
 ) -> Result<ValidationResult, Error> {
-    // Get the Sprint Task's description of expected changes
-    let Ok(task_issue) = octocrab
-        .issues(org_name, module_name)
-        .get(task_issue_number)
-        .await
-    else {
-        return Ok(ValidationResult::CouldNotMatch); // Failed to find the right task
+    let coursework_index = coursework_index::fetch().await?;
+
+    let Some(task) = coursework_index.get(task_id) else {
+        return Ok(ValidationResult::CouldNotMatch);
     };
 
-    let task_issue_body = task_issue.body.unwrap_or_default();
-
-    let directory_description = Regex::new("CHANGE_DIR=(.+)\\n")
-        .map_err(|err| Error::UserFacing(format!("Known good regex failed to compile: {}", err)))?;
-    let Some(directory_regex_captures) = directory_description.captures(&task_issue_body) else {
+    let Some(change_dir) = task.change_dir.as_ref() else {
         return Ok(ValidationResult::Ok); // There is no match defined for this task, don't do any more checks
     };
-    let directory_description_regex = directory_regex_captures
-        .get(1)
-        .expect("Regex capture failed to return string match")
-        .as_str(); // Only allows a single directory for now
 
-    let directory_matcher = Regex::new(directory_description_regex).map_err(|err| {
+    let directory_matcher = Regex::new(change_dir).map_err(|err| {
         Error::UserFacing(format!(
-            "Failed to compile regex from {}, check the CHANGE_DIR declaration: {}",
-            task_issue.html_url, err
+            "Failed to compile regex from {}, check the CHANGE_DIR declaration for task ID: {}",
+            task_id, err
         ))
     })?;
 
@@ -386,22 +354,5 @@ impl KnownRegions {
             }
         }
         false
-    }
-}
-
-fn make_fake_course_schedule(module_name: String) -> CourseSchedule {
-    let fixed_date = NaiveDate::from_ymd_opt(2030, 1, 1).unwrap();
-    let mut sprints = IndexMap::new();
-    sprints.insert(
-        module_name,
-        std::iter::repeat_with(|| btreemap![ARBITRARY_REGION => fixed_date])
-            // 5 is the max number of sprints a module (currently) contains.
-            .take(5)
-            .collect(),
-    );
-    CourseSchedule {
-        start: fixed_date,
-        end: fixed_date,
-        sprints,
     }
 }

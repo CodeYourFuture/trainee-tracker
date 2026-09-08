@@ -19,6 +19,7 @@ pub use config::Config;
 use crate::google_auth::GoogleScope;
 pub mod codility;
 pub mod course;
+pub mod coursework_index;
 pub mod endpoints;
 pub mod frontend;
 pub mod github_accounts;
