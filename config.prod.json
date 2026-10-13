@@ -877,7 +877,7 @@
             ]
           }
         },
-        "26-mar-sdc": {
+        "2026-mar-sdc": {
           "start": "2026-03-10",
           "end": "2026-06-30",
           "sprints": {
@@ -960,6 +960,14 @@
               }
             ],
             "Module-Legacy-Code": [
+              {
+                "Glasgow": "2026-06-06",
+                "London": "2026-06-06",
+                "North West": "2026-06-06",
+                "Sheffield": "2026-06-06",
+                "South Africa": "2026-06-06",
+                "West Midlands": "2026-06-06"
+              },
               {
                 "Glasgow": "2026-06-06",
                 "London": "2026-06-06",
